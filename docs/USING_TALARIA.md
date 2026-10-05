@@ -7,7 +7,7 @@ logged in and connected to your tailnet. On iPhone, keep Tailscale connected.
 
 Open **Home**. The selected host should report both the bridge and Hermes as
 available. If you have multiple hosts, select the intended one before starting
-work. **More → Hosts** manages saved connections. A pairing error requires a
+work. **More → Saved Hosts** manages saved connections. A pairing error requires a
 valid mobile bridge token; provider keys and Research Terminal tokens never
 belong in the phone's host form. See [troubleshooting](TROUBLESHOOTING.md).
 
@@ -86,16 +86,22 @@ See [Research Terminal setup](RESEARCH_TERMINAL_SETUP.md).
 
 ## Updates and background behavior
 
-Every seven days, connect LocalDevVPN, choose **SideStore → My Apps → Refresh All**,
-then reconnect Tailscale. To update Talaria, import the new IPA over the existing
-app with the same SideStore settings you installed it with. Do not delete the app
-or change its installed bundle identifier; either loses saved data and the
-Keychain token. See the [SideStore user guide](SIDESTORE_USER_GUIDE.md). The
-SideStore update/data-preservation and refresh tests passed on the maintainer's
-legacy phone installation (refresh with the patch its unsuffixed ID requires).
-These are historical tests, not physical validation of the new public identity.
-Official SideStore's suffixed new-user path is source-derived; verify your own
-chat and Refresh after installation as the guide describes.
+Use the update/signing method you installed with:
+
+- **Xcode:** retain your installed bundle ID and Team, update the source checkout,
+  then build/run again on the same iPhone. Free Personal Team signing needs a
+  rebuild/reinstall before seven-day expiry; paid signing follows the actual
+  development profile's expiration. See [Xcode installation](XCODE_INSTALL.md).
+- **SideStore:** with free-account signing, refresh before expiry: Tailscale off →
+  LocalDevVPN on (Wi-Fi) → **My Apps → Refresh All** → verify the renewed signing
+  period → LocalDevVPN off → Tailscale on → confirm a fresh Talaria reply. To update
+  app code, import the new IPA with the same identity and Team. See the
+  [SideStore user guide](SIDESTORE_USER_GUIDE.md) for evidence and limits.
+
+LocalDevVPN serves SideStore installation/refresh only; normal Talaria use needs
+Tailscale. Do not delete an app for a routine update. Changing its bundle ID creates
+a separate app whose local preferences/container and Keychain state do not
+transfer automatically; a changed signing Team may also require re-pairing.
 
 There is no APNs push delivery. While suspended, iOS may pause the connection;
 opening Talaria replays retained events and reconciles the conversation. Avoid

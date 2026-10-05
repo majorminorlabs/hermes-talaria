@@ -5,10 +5,25 @@ Canonical public IPA bundle identifier: `xyz.majorminor.talaria`.
 Version `0.1.0`, build `1`; technical project/target/app folder remains Hermes.
 The public Xcode project has no personal Team, profile or certificate.
 
+## Install the published app
+
+Users can [build/install directly with Xcode](docs/XCODE_INSTALL.md) using a free
+Personal Team or paid Apple Developer Program Team, or import the published IPA
+with [SideStore](docs/SIDESTORE_USER_GUIDE.md). SideStore is optional. Both paths
+need Hermes plus the [Mac bridge and pairing setup](docs/INSTALL.md#mac-bridge-setup).
+The canonical release ID stays `xyz.majorminor.talaria`; a self-builder can choose
+a unique ID under their Team, and SideStore normally appends a Team-ID suffix.
+Talaria's runtime Keychain service follows the actual installed bundle ID.
+
+The commands below describe artifact preparation. This documentation update does
+not rebuild, replace, retag or republish the existing v0.1.0 artifacts. Later
+physical install/Refresh evidence and its limits are recorded in
+[release readiness](docs/RELEASE_READINESS.md#current-installation-documentation-after-publication).
+
 ## Build unsigned artifacts without using a phone
 
 The public identity differs from the historical development installation. Old
-physical-PASS evidence does not validate this new identity. The maintainer explicitly
+physical-PASS evidence does not validate this new identity. At the original packaging snapshot, the maintainer explicitly
 authorized Simulator/build validation and excluded physical phone installation.
 
 ```sh
@@ -33,11 +48,13 @@ legacy report as evidence for the new identity. Default packaging creates no IPA
 The IPA has no signature/entitlements blob or embedded provisioning profile.
 Official SideStore supplies the user's own signing and normally appends their
 Team ID. Keep its defaults; the source-derived new-user path requires no patch.
-See [the user guide](docs/SIDESTORE_USER_GUIDE.md). New-ID physical installation,
-second-account registration/Refresh and expiry recovery are not claimed.
+See [the user guide](docs/SIDESTORE_USER_GUIDE.md). The original packaging snapshot did not claim new-ID physical installation; later
+suffixed validation is documented separately. Second-account signing/Refresh and
+actual expiry recovery remain untested.
 
-Direct Xcode device builds require your own registerable identifier/Team in ignored
-local signing settings. Copy `Config/Signing.example.xcconfig` to ignored
+Direct Xcode device builds use your own Team and an identifier it can register;
+see [the practical Xcode guide](docs/XCODE_INSTALL.md). Keep Team settings in ignored
+local signing configuration and any project bundle-ID edit uncommitted. Copy `Config/Signing.example.xcconfig` to ignored
 `Signing.local.xcconfig`; never commit the populated copy. Selecting a Team in Xcode
 may write the project, so inspect changes before committing. The release script
 clears Team/signing identity. No physical deployment is part of this preparation.

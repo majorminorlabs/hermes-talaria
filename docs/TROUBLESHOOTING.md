@@ -18,12 +18,26 @@
 - **Camera/dictation denied:** enable the relevant permission in iOS Settings
   if you choose. On-device recognition depends on device/language; otherwise
   Apple's network recognizer is used. No dictation audio enters the bridge.
-- **App expired:** refresh with SideStore or rebuild/sign with your own Team.
+- **Xcode signing / bundle-ID error:** use your own Team and a unique identifier
+  it can register. Free Personal Team signing is supported; paid membership is
+  not required. See [Xcode signing troubleshooting](XCODE_INSTALL.md#common-signing-problems).
+- **App expired:** use the method you installed with: refresh with SideStore or
+  rebuild/reinstall with Xcode and your own Team.
   Preserve the bundle ID and update in place; do not delete the app. A change
   of signing team/access group can require bridge re-pairing.
+- **SideStore install/refresh cannot reach device services:** turn Tailscale off,
+  connect LocalDevVPN on Wi-Fi and retry. Afterwards turn LocalDevVPN off and
+  Tailscale on for normal Talaria connectivity.
+- **Maximum installed free-profile apps:** SideStore counts toward the three-app
+  limit. Remove only an approved unneeded installed app; stale App-ID registrations
+  are a separate limit and can expire naturally. See
+  [account limits](SIDESTORE_USER_GUIDE.md#free-account-capacity-and-app-ids).
+
+## Advanced legacy or exact-ID troubleshooting
+
 - **SideStore shows 7 days but Talaria still expires:** your Talaria is installed
   at an unsuffixed identifier (advanced/legacy case) and SideStore is an unpatched build. See the
-  [SideStore user guide](SIDESTORE_USER_GUIDE.md#if-an-unpatched-sidestore-replaces-the-patched-build-section-b-only).
+  [SideStore user guide](SIDESTORE_USER_GUIDE.md#advanced-legacy-or-exact-id-installations).
 
 Issue reports should contain app/bridge versions, a redacted error code and steps.
 Exclude tokens, provider credentials, private hostnames, device IDs, personal

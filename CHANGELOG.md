@@ -1,5 +1,10 @@
 # Changelog
 
+The entry below is the original release-preparation snapshot. Current installation
+supports [Xcode](docs/XCODE_INSTALL.md) and [SideStore](docs/SIDESTORE_USER_GUIDE.md);
+later public-ID phone validation is recorded in [release readiness](docs/RELEASE_READINESS.md).
+The published v0.1.0 release artifacts remain unchanged.
+
 ## 0.1.0 — prepared prerelease (2026-10-05)
 
 ### Public identity

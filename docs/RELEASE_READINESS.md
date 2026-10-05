@@ -2,7 +2,38 @@
 
 Prepared 2026-10-05 from the separate sanitized public repository. Product Talaria;
 publisher MAJOR//MINOR; backend Hermes. Canonical unsigned IPA bundle ID
-`xyz.majorminor.talaria`, version 0.1.0/build 1. Nothing is pushed, tagged or published.
+`xyz.majorminor.talaria`, version 0.1.0/build 1. At that preparation snapshot, nothing had been pushed,
+tagged or published; see the later documentation status below.
+
+## Current installation documentation (after publication)
+
+Talaria supports two routes: [Xcode with your own Apple Developer Team](XCODE_INSTALL.md)
+and [official SideStore](SIDESTORE_USER_GUIDE.md). A free Personal Team can use
+Xcode; paid membership is optional for personal-device testing. Both routes use
+the shared [Mac bridge and pairing setup](INSTALL.md#mac-bridge-setup).
+Self-builders may change the bundle ID to a unique identifier under their own
+Team. The Keychain service follows the actual runtime ID; different IDs create
+separate app/container/preferences/Keychain identities.
+
+Later physical validation on 2026-10-05 installed the published IPA under its
+normal Team-suffixed public identity on one Apple Account. Pairing, bot inventory,
+streamed normal/bot chat, existing history, Home, Tasks, Settings, Photos/Files,
+force quit/relaunch, and ordinary Refresh with a matching renewed profile passed.
+It used an existing SideStore build carrying the legacy same-Team fix, so it does
+not establish a stock-build or second-account physical result. Refresh All was
+skipped in that session to preserve a separate rollback install. Detailed evidence
+boundaries are in the [SideStore guide](SIDESTORE_USER_GUIDE.md#identity-and-evidence).
+Direct Xcode installation was previously exercised with the development identity;
+a new self-builder Team/ID and paid-Team provisioning were not physically retested
+for this documentation update.
+
+The published v0.1.0 IPA, checksums, tag and release remain unchanged. The original
+`BUILD_METADATA.json` still reports physical validation as NOT_PERFORMED **at
+packaging time**. Later suffixed validation does not replace that metadata or
+satisfy the packaging script's exact canonical-ID report gate automatically.
+The preparation record below retains its original evidence and publication limits.
+
+## Original release-preparation record
 
 ## Identity and validation boundary
 

@@ -1,3 +1,12 @@
+# Original v0.1.0 release-note snapshot
+
+These notes preserve the publication-time evidence below; they are not the current
+installation instructions. Choose [Xcode / your Apple Developer Team](XCODE_INSTALL.md)
+or [SideStore](SIDESTORE_USER_GUIDE.md), with the shared [bridge setup](INSTALL.md).
+See [release readiness](RELEASE_READINESS.md#current-installation-documentation-after-publication)
+for later physical public-ID validation. The published GitHub release body and
+artifacts have not been edited.
+
 Talaria is MAJOR//MINOR's native iPhone companion for Hermes on your Mac: persistent
 streaming chat, Bot Mode management, tasks/status, attachments and dictation through
 a private authenticated Tailscale bridge. Includes the self-hosted bridge package,
