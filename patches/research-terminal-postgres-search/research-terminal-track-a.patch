@@ -1,0 +1,439 @@
+diff --git a/apps/api/src/research_terminal/api/routes/hermes.py b/apps/api/src/research_terminal/api/routes/hermes.py
+--- a/apps/api/src/research_terminal/api/routes/hermes.py
++++ b/apps/api/src/research_terminal/api/routes/hermes.py
+@@ -26,0 +27,1 @@
++from ...services.hermes_knowledge import serialize_hermes_knowledge
+@@ -817,13 +818,1 @@
+-    return {
+-        "items": [
+-            {
+-                "record_type": item.record_type,
+-                "record_id": item.record_id,
+-                "title": item.title,
+-                "excerpt": item.excerpt,
+-                "score": item.score,
+-                "source_ids": [source.id for source in item.source_refs],
+-            }
+-            for item in records
+-        ]
+-    }
++    return serialize_hermes_knowledge(records)
+diff --git a/apps/api/src/research_terminal/main.py b/apps/api/src/research_terminal/main.py
+--- a/apps/api/src/research_terminal/main.py
++++ b/apps/api/src/research_terminal/main.py
+@@ -17,0 +18,1 @@
++from .api.routes.hermes_knowledge import router as hermes_knowledge_router
+@@ -116,0 +118,1 @@
++        app.include_router(hermes_knowledge_router, prefix="/api/v1")
+diff --git a/apps/api/src/research_terminal/persistence/postgres_runtime.py b/apps/api/src/research_terminal/persistence/postgres_runtime.py
+--- a/apps/api/src/research_terminal/persistence/postgres_runtime.py
++++ b/apps/api/src/research_terminal/persistence/postgres_runtime.py
+@@ -17,0 +18,2 @@
++from ..db.fts import _matched_term_count, _query_tokens
++from ..services.retrieval import RetrievedRecord, SourceReference
+@@ -20,0 +23,15 @@
++
++
++def _hermes_excerpt(value: str, tokens: list[str], *, max_chars: int = 1_200) -> str:
++    """Return a bounded plain-text excerpt near the first matched query term."""
++
++    folded = value.casefold()
++    positions = [position for token in tokens if (position := folded.find(token)) >= 0]
++    start = max(0, min(positions, default=0) - 180)
++    end = min(len(value), start + max_chars)
++    excerpt = value[start:end].strip()
++    if start:
++        excerpt = "… " + excerpt
++    if end < len(value):
++        excerpt += " …"
++    return excerpt
+@@ -289,0 +307,107 @@
++    def search_hermes_knowledge(
++        self, query: str, *, limit: int = 8
++    ) -> list[RetrievedRecord]:
++        """Search active PostgreSQL archive sources and findings for Hermes.
++
++        The SQLite and PostgreSQL adapters share the same token selection,
++        relevance gate, result type, and HTTP serialization. PostgreSQL uses
++        its native full-text parser over the canonical archive tables rather
++        than opening the SQLite projection in PostgreSQL mode.
++        """
++
++        tokens = _query_tokens(query)
++        if not tokens:
++            return []
++
++        # Tokens come from the shared word-only tokenizer, so each term is
++        # safe to quote as a tsquery lexeme. Prefix matching mirrors the
++        # SQLite FTS adapter's useful inflection behavior.
++        tsquery = " | ".join(f"'{token}':*" for token in tokens)
++        bounded_limit = min(max(limit, 1), 20)
++        candidate_limit = min(max(bounded_limit * 8, 48), 160)
++        schema = self.archive.schema
++        statement = text(
++            f"""WITH parsed_query AS (
++                       SELECT to_tsquery('simple', :tsquery) AS value
++                   ), candidates AS (
++                       SELECT 'source'::text AS record_type, s.id::text AS record_id,
++                              s.title,
++                              concat_ws(' ', s.title, s.canonical_uri, s.source_type,
++                                        s.authors::text, s.doi, s.provider, s.abstract) AS body,
++                              s.created_at,
++                              ARRAY[s.id::text] AS source_ids
++                       FROM {schema}.sources s
++                       WHERE s.status = 'active' AND s.archived_at IS NULL
++                       UNION ALL
++                       SELECT 'finding'::text AS record_type, f.id::text AS record_id,
++                              f.statement AS title,
++                              concat_ws(' ', f.statement, f.details, f.uncertainty) AS body,
++                              f.created_at,
++                              COALESCE(source_refs.source_ids, ARRAY[]::text[]) AS source_ids
++                       FROM {schema}.findings f
++                       LEFT JOIN LATERAL (
++                           SELECT array_agg(DISTINCT e.source_id::text
++                                            ORDER BY e.source_id::text) AS source_ids
++                           FROM {schema}.finding_evidence fe
++                           JOIN {schema}.evidence e ON e.id = fe.evidence_id
++                           WHERE fe.finding_id = f.id
++                             AND e.source_id IS NOT NULL
++                             AND e.archived_at IS NULL
++                       ) source_refs ON TRUE
++                       WHERE f.lifecycle_status = 'active' AND f.archived_at IS NULL
++                   )
++                   SELECT c.record_type, c.record_id, c.title, c.body, c.source_ids,
++                          ts_rank_cd(to_tsvector('simple', c.body), q.value) AS score
++                   FROM candidates c
++                   CROSS JOIN parsed_query q
++                   WHERE to_tsvector('simple', c.body) @@ q.value
++                   ORDER BY score DESC, c.created_at DESC, c.record_type, c.record_id
++                   LIMIT :candidate_limit"""
++        )
++        with self.engine.connect() as connection:
++            rows = (
++                connection.execute(
++                    statement,
++                    {"tsquery": tsquery, "candidate_limit": candidate_limit},
++                )
++                .mappings()
++                .all()
++            )
++
++        minimum_matches = 1 if len(tokens) == 1 else 2
++        results: list[RetrievedRecord] = []
++        for row in rows:
++            title = str(row["title"] or "")
++            body = str(row["body"] or "")
++            matched_terms = _matched_term_count(tokens, f"{title} {body}")
++            if matched_terms < minimum_matches:
++                continue
++            title_matches = _matched_term_count(tokens, title)
++            if len(tokens) > 2 and title_matches == 0 and matched_terms < 3:
++                continue
++
++            source_ids = row["source_ids"] or []
++            source_refs = tuple(
++                SourceReference(str(source_id), "", "", "source record")
++                for source_id in source_ids
++            )
++            score = float(row["score"] or 0.0)
++            results.append(
++                RetrievedRecord(
++                    record_type=str(row["record_type"]),  # type: ignore[arg-type]
++                    record_id=str(row["record_id"]),
++                    title=title,
++                    excerpt=_hermes_excerpt(body, tokens),
++                    body=body[:8_000],
++                    score=score,
++                    source_refs=source_refs,
++                    topic_ids=(),
++                    fts_score=score,
++                    matched_queries=(query.strip(),),
++                    term_coverage=matched_terms / len(tokens),
++                )
++            )
++            if len(results) >= bounded_limit:
++                break
++        return results
++
+diff --git a/apps/api/tests/test_hermes_client.py b/apps/api/tests/test_hermes_client.py
+--- a/apps/api/tests/test_hermes_client.py
++++ b/apps/api/tests/test_hermes_client.py
+@@ -134,0 +135,33 @@
++def test_knowledge_search_uses_the_canonical_authenticated_route(monkeypatch, capsys) -> None:
++    calls: list[dict[str, Any]] = []
++
++    def fake_request(method: str, path: str, payload=None, *, timeout: float = 30) -> object:
++        calls.append({"method": method, "path": path, "payload": payload, "timeout": timeout})
++        return {
++            "items": [
++                {
++                    "record_type": "source",
++                    "record_id": "fixture-source-id",
++                    "title": "Fixture corpus record",
++                    "excerpt": "A real stored source excerpt.",
++                    "score": 0.5,
++                    "source_ids": ["fixture-source-id"],
++                }
++            ]
++        }
++
++    monkeypatch.setattr(hermes_client, "_request", fake_request)
++
++    assert hermes_client.main(["search", "fixture corpus", "--limit", "5"]) == 0
++
++    assert calls == [
++        {
++            "method": "POST",
++            "path": "/hermes/knowledge/search",
++            "payload": {"query": "fixture corpus", "limit": 5},
++            "timeout": 30,
++        }
++    ]
++    assert '"record_type": "source"' in capsys.readouterr().out
++
++
+diff --git a/apps/api/tests/test_postgres_pipeline.py b/apps/api/tests/test_postgres_pipeline.py
+--- a/apps/api/tests/test_postgres_pipeline.py
++++ b/apps/api/tests/test_postgres_pipeline.py
+@@ -7,0 +8,1 @@
++from dataclasses import replace
+@@ -51,0 +53,17 @@
++        # Migration 0015 owns this test-only projection outside its resettable
++        # schemas. Remove its exact objects before dropping the migration ledger
++        # so repeated fixture setup remains safe in the disposable test DB.
++        connection.exec_driver_sql(
++            "DROP VIEW IF EXISTS public.mm_labs_public_registry_studies CASCADE"
++        )
++        connection.exec_driver_sql(
++            """DO $$ BEGIN
++                IF EXISTS (
++                    SELECT 1 FROM pg_roles
++                    WHERE rolname = 'mm_labs_registry_projection_owner'
++                ) THEN
++                    DROP OWNED BY mm_labs_registry_projection_owner;
++                    DROP ROLE mm_labs_registry_projection_owner;
++                END IF;
++            END $$;"""
++        )
+@@ -54,0 +73,13 @@
++        connection.exec_driver_sql(
++            """DO $$ BEGIN
++                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
++                    CREATE ROLE anon NOLOGIN;
++                END IF;
++                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
++                    CREATE ROLE authenticated NOLOGIN;
++                END IF;
++                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
++                    CREATE ROLE service_role NOLOGIN;
++                END IF;
++            END $$;"""
++        )
+@@ -71,1 +102,11 @@
+-    apply_ops_migrations(engine, Path(__file__).resolve().parents[1] / "migrations/postgres")
++    migration_source = Path(__file__).resolve().parents[1] / "migrations/postgres"
++    isolated_migrations = tmp_path / "postgres-migrations"
++    isolated_migrations.mkdir()
++    for path in migration_source.glob("*.sql"):
++        # This production promotion requires an established Supabase owner and
++        # the exact deployed Registry view; it is not a migration for a fresh
++        # PostgreSQL integration fixture.
++        if path.name == "0017_public_registry_e007_e008.sql":
++            continue
++        (isolated_migrations / path.name).symlink_to(path)
++    apply_ops_migrations(engine, isolated_migrations)
+@@ -651,0 +693,66 @@
++
++
++def test_postgres_hermes_knowledge_search_is_authenticated_and_maps_archive_records(
++    postgres_runtime,
++) -> None:
++    runtime, original_settings = postgres_runtime
++    source = runtime.archive.create_source(
++        title="Cobalt Falcon PostgreSQL search fixture",
++        canonical_uri="https://example.test/cobalt-falcon",
++        source_system="hermes-search-test",
++        source_record_id="cobalt-falcon-source",
++        idempotency_key="hermes-search-test:cobalt-falcon-source",
++        abstract="Cobalt Falcon evidence stored in the PostgreSQL research corpus.",
++    )
++    finding = runtime.archive.create_finding(
++        statement="Cobalt Falcon finding is grounded in the fixture source.",
++        originating_run_id=None,
++        source_system="hermes-search-test",
++        source_record_id="cobalt-falcon-finding",
++        idempotency_key="hermes-search-test:cobalt-falcon-finding",
++        details="The result should map back to its source record.",
++    )
++    runtime.archive.create_evidence(
++        observation="Cobalt Falcon evidence locator",
++        source_id=source.id,
++        originating_run_id=None,
++        source_system="hermes-search-test",
++        source_record_id="cobalt-falcon-evidence",
++        finding_id=finding.id,
++        locator="fixture abstract",
++    )
++    settings = replace(
++        original_settings,
++        persistence_backend="postgres",
++        hermes_api_token_value="pg-search-fixture-token",
++    )
++    from research_terminal.main import create_app
++
++    app = create_app(
++        settings=settings,
++        database_engine=runtime.engine,
++        model_gateway=FixtureGateway(),
++    )
++    with TestClient(app) as client:
++        unauthenticated = client.post(
++            "/api/v1/hermes/knowledge/search",
++            json={"query": "Cobalt Falcon", "limit": 5},
++        )
++        assert unauthenticated.status_code == 401
++
++        response = client.post(
++            "/api/v1/hermes/knowledge/search",
++            headers={"Authorization": "Bearer pg-search-fixture-token"},
++            json={"query": "Cobalt Falcon", "limit": 5},
++        )
++        assert response.status_code == 200, response.text
++        items = response.json()["items"]
++        source_item = next(item for item in items if item["record_id"] == str(source.id))
++        finding_item = next(item for item in items if item["record_id"] == str(finding.id))
++
++        assert source_item["record_type"] == "source"
++        assert source_item["title"] == "Cobalt Falcon PostgreSQL search fixture"
++        assert source_item["source_ids"] == [str(source.id)]
++        assert finding_item["record_type"] == "finding"
++        assert finding_item["source_ids"] == [str(source.id)]
++        assert "Cobalt Falcon" in finding_item["excerpt"]
+diff --git a/apps/api/src/research_terminal/api/routes/hermes_knowledge.py b/apps/api/src/research_terminal/api/routes/hermes_knowledge.py
+new file mode 100644
+--- /dev/null
++++ b/apps/api/src/research_terminal/api/routes/hermes_knowledge.py
+@@ -0,0 +1,32 @@
++"""Hermes knowledge-search compatibility route for PostgreSQL mode."""
++
++from __future__ import annotations
++
++from fastapi import APIRouter, Depends, HTTPException, Request, status
++
++from ...services.hermes_knowledge import serialize_hermes_knowledge
++from ..schemas import HermesKnowledgeResponse, HermesKnowledgeSearch
++from .hermes import require_hermes
++
++router = APIRouter(prefix="/hermes", tags=["hermes"])
++
++
++@router.post(
++    "/knowledge/search",
++    response_model=HermesKnowledgeResponse,
++    dependencies=[Depends(require_hermes)],
++)
++def search_knowledge_postgres(
++    payload: HermesKnowledgeSearch,
++    request: Request,
++) -> dict[str, object]:
++    """Search canonical archive records using the existing Hermes contract."""
++
++    runtime = getattr(request.app.state, "postgres_runtime", None)
++    if runtime is None:
++        raise HTTPException(
++            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
++            detail="PostgreSQL runtime is not enabled",
++        )
++    records = runtime.search_hermes_knowledge(payload.query, limit=payload.limit)
++    return serialize_hermes_knowledge(records)
+diff --git a/apps/api/src/research_terminal/services/hermes_knowledge.py b/apps/api/src/research_terminal/services/hermes_knowledge.py
+new file mode 100644
+--- /dev/null
++++ b/apps/api/src/research_terminal/services/hermes_knowledge.py
+@@ -0,0 +1,25 @@
++"""Shared response mapping for Hermes knowledge search adapters."""
++
++from __future__ import annotations
++
++from collections.abc import Iterable
++
++from .retrieval import RetrievedRecord
++
++
++def serialize_hermes_knowledge(records: Iterable[RetrievedRecord]) -> dict[str, object]:
++    """Keep the Hermes search payload stable across SQLite and PostgreSQL."""
++
++    return {
++        "items": [
++            {
++                "record_type": item.record_type,
++                "record_id": item.record_id,
++                "title": item.title,
++                "excerpt": item.excerpt,
++                "score": item.score,
++                "source_ids": [source.id for source in item.source_refs],
++            }
++            for item in records
++        ]
++    }
+diff --git a/docs/HERMES_POSTGRES_SEARCH.md b/docs/HERMES_POSTGRES_SEARCH.md
+new file mode 100644
+--- /dev/null
++++ b/docs/HERMES_POSTGRES_SEARCH.md
+@@ -0,0 +1,56 @@
++# Hermes knowledge search in PostgreSQL mode
++
++Hermes uses the same authenticated endpoint and response shape with either
++Research Terminal persistence backend:
++
++```text
++POST /api/v1/hermes/knowledge/search
++Authorization: Bearer <Research Terminal Hermes token>
++{"query":"...","limit":8}
++```
++
++The `research-terminal` helper already calls this endpoint. Before the
++PostgreSQL compatibility route was added, `create_app()` registered the full
++ORM-backed Hermes router only for SQLite. PostgreSQL mode intentionally omitted
++those SQLite-only routes, so knowledge search returned 404 even though status
++and other PostgreSQL-native endpoints worked.
++
++PostgreSQL mode now registers a narrow authenticated compatibility route. It
++searches active, non-archived records in the configured canonical archive
++schema: sources and findings. PostgreSQL's `simple` full-text parser handles
++the shared Hermes query tokens with prefix matching. The adapter applies the
++same token selection and minimum-match checks as SQLite retrieval and returns
++the existing `record_type`, `record_id`, `title`, `excerpt`, `score`, and
++`source_ids` fields. Finding source IDs come from the canonical
++`finding_evidence` and `evidence.source_id` relationships. SQLite continues to
++use its existing FTS5 projection; no second API or alternate helper command is
++required.
++
++No database migration or corpus write is required. The API service must be
++restarted after deploying this code so it registers the compatibility route.
++The route does not create records or launch research jobs.
++
++## Validation
++
++The PostgreSQL integration regression uses the disposable database selected
++by `RESEARCH_TEST_POSTGRES_URL`; it creates a fixture source and checks the
++authenticated HTTP response and source mapping. The helper regression verifies
++that `search` still posts to the canonical endpoint. Run them with:
++
++```sh
++.venv/bin/python -m pytest apps/api/tests/test_postgres_pipeline.py -k hermes_knowledge
++.venv/bin/python -m pytest apps/api/tests/test_hermes_client.py -k search
++```
++
++After restarting a PostgreSQL-mode API, run a harmless existing-corpus lookup:
++
++```sh
++scripts/hermes-research-terminal search "<distinctive existing topic>" --limit 5
++```
++
++The helper reads its bearer token through
++`RESEARCH_TERMINAL_API_TOKEN_FILE`; never put the token value in shell history,
++arguments, logs, or this document. A 401 indicates token configuration or
++permissions; a 404 indicates the deployed API has not registered this route;
++an empty `items` array means the query did not match an active source or
++finding in the configured archive schema.

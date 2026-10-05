@@ -1,0 +1,3 @@
+// Copy to ../Signing.local.xcconfig; that file is ignored.
+// Set your own Apple Team identifier locally. Never commit the populated copy.
+DEVELOPMENT_TEAM =

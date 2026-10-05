@@ -1,0 +1,71 @@
+# macOS
+.DS_Store
+
+# Xcode — per-user state and build output
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+build/
+*.xcresult
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.hmap
+*.moved-aside
+timeline.xctimeline
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Signing material and local secrets — never commit
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+!.env.example
+
+# UI-test screenshot output (written to $SCREENSHOT_DIR when set)
+/screenshots/
+
+# Python tooling used by hermes-mobile-bridge alongside this project
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+# Editors
+.idea/
+*.swp
+
+# Deployment/release output and local signing overrides
+dist/
+*.xcarchive
+Signing.local.xcconfig
+*.pem
+*.key
+# Private deployment credentials belong outside the checkout
+mobile-pairing.json
+operator.json
+dashboard-token
+installation.json
+transport.json
+
+# Release/device validation artifacts and local scratch
+*.log
+*.pyc
+*.pyo
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.xcdistributionlogs
+*.trace
+*.ips
+.pairing
+*.mobiledevicepairing
+/Signing.local.*

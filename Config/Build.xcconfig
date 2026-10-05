@@ -1,0 +1,2 @@
+// Shared build configuration; personal signing is optional and untracked.
+#include? "../Signing.local.xcconfig"

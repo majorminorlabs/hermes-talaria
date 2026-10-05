@@ -1,0 +1,50 @@
+[
+  {
+    "path": "apps/api/src/research_terminal/api/routes/hermes.py",
+    "baseline_sha256": "c2b068d453a22247271e306417b58ea45b674801dbc1de22ffc82778c57ed78f",
+    "current_sha256": "cddbd38612e59aeecea27aa4e98a0b126f6e7d14076048a5dbad06f3376dbacb",
+    "new_file": false
+  },
+  {
+    "path": "apps/api/src/research_terminal/main.py",
+    "baseline_sha256": "fc2866afb1e9bd6e0f0f46506d0268e156c06147b1a8f759dd01c78bec4696e1",
+    "current_sha256": "76174219bece8010d4f460b1e34266f5b1d01b8f8dfe6a8ab884a1bdff47c5fe",
+    "new_file": false
+  },
+  {
+    "path": "apps/api/src/research_terminal/persistence/postgres_runtime.py",
+    "baseline_sha256": "87c7b6ccc0dfc641bb8b32e60f659e1a1857b7be0758902ab630752867e0bd80",
+    "current_sha256": "173636dedec5feaf52308342021a3588917de2b1df4c7870176927bc17e91759",
+    "new_file": false
+  },
+  {
+    "path": "apps/api/tests/test_hermes_client.py",
+    "baseline_sha256": "f0d49294eb88d5768662f0bdb268f9d62977d1bb7555cfefd1148bf6e63ccbb1",
+    "current_sha256": "be578a64bd6bee5b740e67882ddb7ee499e24a7bb30d3ef4394ea285fc9fd739",
+    "new_file": false
+  },
+  {
+    "path": "apps/api/tests/test_postgres_pipeline.py",
+    "baseline_sha256": "c8d93118f4b952c296cdf7f2b1a354abf9f8d384d7efaf2f4e6f8cb164882a36",
+    "current_sha256": "655bdbad1cc7b83495a35c7c5af473c41578f1b51bb3df29be5db3dbc7ae38a5",
+    "new_file": false
+  },
+  {
+    "path": "apps/api/src/research_terminal/api/routes/hermes_knowledge.py",
+    "baseline_sha256": null,
+    "current_sha256": "bd94014c5950794ca27642b79666b6e7284b937029cef5d73f863215a66f36fb",
+    "new_file": true
+  },
+  {
+    "path": "apps/api/src/research_terminal/services/hermes_knowledge.py",
+    "baseline_sha256": null,
+    "current_sha256": "654374349a020bf5d7f518f596a3e4d6b12a21cff60776d8adef46e590794224",
+    "new_file": true
+  },
+  {
+    "path": "docs/HERMES_POSTGRES_SEARCH.md",
+    "baseline_sha256": null,
+    "current_sha256": "304baf0b5b037b6b78c4d59e5a5bc8a0428f5d83b35466d847cb8c3191431e33",
+    "new_file": true
+  }
+]

@@ -1,0 +1,49 @@
+From 2e3f2b14ad8e784d00cf1b48c7682c2b3b32bd03 Mon Sep 17 00:00:00 2001
+From: Talaria investigation <noreply@localhost>
+Date: Mon, 5 Oct 2026 10:34:44 -0500
+Subject: [PATCH] Restore AltStore preferredBundleID team-match rule for
+ refresh
+
+Since 2873e2ec ("diag: added more logging for fetch provisioning
+profiles operation"), getPreferredBundleID only reuses an installed app's
+resigned bundle identifier when that identifier contains the Team ID,
+even if installedApp.team is the current team. AltStore's rule makes the
+suffix check a fallback for records without a team.
+
+Apps installed with Customize AppID and "Append Team ID" unchecked keep an
+unsuffixed resigned ID (e.g. com.example.app). Refresh has no
+user-customization step and starts with appendTeamID = true, so it no
+longer reused that ID: it registered/fetched a profile for
+com.example.app.<TEAM> and installed it, leaving the installed app's real
+profile to expire while the UI showed a fresh expiry.
+
+Restore AltStore's rule: a same-team install keeps its resigned
+identifier. Suffixed installs and team changes behave as before.
+---
+ .../FetchProvisioningProfilesOperation.swift           | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift b/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
+index 7b9338f1..039fcad5 100644
+--- a/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
+@@ -102,10 +102,12 @@ class FetchProvisioningProfilesOperation: BasePipelineOperation<InstallAppOperat
+                 return nil
+             }
+             
+-            // Teams match if installedApp.team has same identifier as team (or team is nil)
+-            // AND installedApp.resignedBundleIdentifier actually contains the team's identifier.
+-            let teamsMatch = (installedApp.team?.identifier == team.identifier || installedApp.team == nil)
+-                             && installedApp.resignedBundleIdentifier.contains(team.identifier)
++            // Teams match if installedApp.team has same identifier as team,
++            // or if installedApp.team is nil but resignedBundleIdentifier contains the team's identifier.
++            // An app installed by this team keeps its resigned bundle identifier on refresh, even when
++            // it has no Team ID suffix (e.g. installed with "Append Team ID" unchecked).
++            let teamsMatch = installedApp.team?.identifier == team.identifier
++                             || (installedApp.team == nil && installedApp.resignedBundleIdentifier.contains(team.identifier))
+             
+             self.verboseLog("[FetchProvisioningProfiles] preferredBundleID check: app=\(targetAppBundle.bundleIdentifier), installedResignedID=\(installedApp.resignedBundleIdentifier), installedTeam=\(installedApp.team?.identifier ?? "nil"), targetTeam=\(team.identifier), teamsMatch=\(teamsMatch)")
+ 
+-- 
+2.53.0
+
