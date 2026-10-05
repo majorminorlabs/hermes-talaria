@@ -1,158 +1,121 @@
 # Talaria
 
-Talaria is MAJOR//MINOR's open-source, self-hosted iPhone companion for Hermes running on your Mac. Hermes runs
-the agents and keeps their records; Talaria provides chat, bots, tasks and status
-through a private authenticated bridge.
+**Hermes on your Mac, in your pocket.**
 
-**v0.1.0 is an early personal-install release.** It is not available on the App
-Store. Its permanent public IPA bundle identifier is `xyz.majorminor.talaria`.
-Install from source with Xcode and your own Apple Developer Team, or re-sign the
-published IPA with SideStore. Both routes need Hermes and hermes-mobile-bridge
-on your Mac; SideStore is optional.
+A native iPhone companion for Hermes. Talaria connects securely to your
+self-hosted Hermes instance on a Mac through **hermes-mobile-bridge** and
+**Tailscale**. Hermes runs the agents and keeps their records; Talaria brings
+conversations, bots and tasks to your phone.
+
+[**v0.1.0 prerelease**](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0)
+· [Install](docs/INSTALL.md) · [User guide](docs/USING_TALARIA.md)
+· [MAJOR//MINOR](https://majorminor.xyz)
+
+<p>
+  <img src="docs/images/bots.png" alt="Talaria Bots: shared Hermes bots and their current activity" width="240">
+  <img src="docs/images/bot-detail.png" alt="Talaria bot detail: chat, configuration and bot management" width="240">
+</p>
+
+*Current-interface simulator screenshots with fictional demonstration bots.*
+
+## Features
+
+- **Conversations:** persistent Hermes chats, streamed replies, tool/activity
+  history, stop and steer.
+- **Bots:** Bot Mode discovery and shared bot chats; create, edit, duplicate and
+  hide bots where the host supports those capabilities.
+- **Tasks:** routines, configured Kanban boards and current run status.
+- **Attachments:** Files, Photos and Camera captures, with previews.
+- **Dictation:** native speech-to-text into an editable message composer.
+- **Connection recovery:** reconnect/replay, foreground reconciliation and cached
+  last-known state while offline.
+- **Private remote access:** authenticated bridge traffic over your Tailscale network.
+
+Capabilities depend on the configured Hermes host. Optional Research Terminal
+retrieval is also available; see the [user guide](docs/USING_TALARIA.md).
+
+## Architecture
 
 ```text
-Talaria on iPhone → private Tailscale HTTPS → hermes-mobile-bridge → Hermes on Mac
+Talaria / iPhone → private Tailscale HTTPS → hermes-mobile-bridge → Hermes / Mac
 ```
 
-## What works
-
-- Persistent conversations, streaming replies, tool/activity history, stop and steer.
-- Hermes Bot Mode: dynamic discovery, canonical writable bot chats, create/edit,
-  duplicate and hide. Native Hermes profiles remain the source of truth.
-- Tasks, routines, configured Kanban boards, usage and current run status.
-- Files, Photo Library and new Camera captures with attachment previews.
-- Native speech-to-text into the editable composer; microphone audio stays out
-  of the Hermes bridge.
-- Reconnect/replay, foreground reconciliation and cached last-known state offline.
-- Research Terminal retrieval/search when the host skill and credentials are configured.
-- Talaria branding, light/dark appearances and accessible Markdown tables.
-
-Features are capability-gated by the host. Dangerous tool approvals remain
-Studio-only because the audited Hermes protocol cannot safely target them.
+AI and agent workloads run on the Mac. The phone provides a native remote
+interface; your Mac must be awake, logged in and reachable. Provider credentials
+stay on the Mac, and Talaria stores its scoped bridge token in iPhone Keychain.
 
 ## Requirements
 
-- macOS host with Python 3.11+ and an existing, prepared Hermes installation.
-- Full Bot Mode/media support was tested against Hermes commit
-  `4bb9e57bfde8a0affb5553eff13ed6e1f14147f1`. The bridge also supports the audited
-  legacy `2a4c9afd7bd` contract with fewer capabilities; arbitrary newer versions
-  are not automatically trusted.
-- Tailscale on Mac and iPhone, MagicDNS/HTTPS and an access policy permitting
-  the phone to reach the host on TCP 443. Serve stays private; Funnel is unused.
-- iOS 18+, Xcode 26+ for development, and your own Apple signing identity for
-  personal installation. SideStore can re-sign the unsigned IPA.
+- An **iPhone running iOS 18 or newer**.
+- A **Mac running Hermes**, with **Python 3.11+** and hermes-mobile-bridge installed.
+- **Tailscale on both devices**, with private HTTPS and an access policy permitting
+  the phone to reach the bridge.
+- **Your own Apple signing**, using either Xcode or SideStore below.
 
-## Install
+The bridge targets audited Hermes versions; check the
+[bridge requirements](docs/INSTALL.md#requirements) before setting up your host.
 
-Choose either installation method. Both connect to the same self-hosted backend:
+## Installation
 
-```text
-Hermes on Mac → hermes-mobile-bridge → private Tailscale HTTPS → Talaria on iPhone
-```
+### Xcode / Apple signing
 
-### Option A: Xcode / Apple Developer
+Build from source with **Xcode 26+** and your own Apple Developer Team. A free
+Personal Team works for personal-device testing; paid membership is optional.
+Free signing needs rebuilding/reinstalling before seven-day expiry.
 
-1. Clone `https://github.com/majorminorlabs/hermes-talaria.git` and open
-   **Hermes.xcodeproj**. The Talaria app target and scheme are named **Hermes**.
-2. Select that app target → **Signing & Capabilities**, enable automatic signing,
-   and choose your own Apple Developer Team.
-3. If needed, change the bundle identifier to one your Team can register, such
-   as `com.example.talaria` or a reverse-DNS ID based on a domain you control.
-4. Connect and unlock your iPhone, select it as the run destination, then
-   **Product → Run** to build and install Talaria.
-5. Install/configure hermes-mobile-bridge on the Mac that runs Hermes, then pair
-   Talaria using the shared [bridge setup and pairing guide](docs/INSTALL.md#mac-bridge-setup).
+Follow [Xcode installation](docs/XCODE_INSTALL.md). The project, app target and
+scheme are named **Hermes**; the installed app is **Talaria**. Self-builders may
+use a unique bundle identifier such as `com.example.talaria`. Changing identity
+creates a separate app with its own local state; see the guide for signing details.
 
-**SideStore is not needed for this route.** A free Apple Account's **Personal Team**
-works for personal-device testing but expires after seven days and needs rebuilding
-and reinstalling. Paid Apple Developer Program membership uses normal development
-provisioning without the free Personal Team's weekly limit; check the actual
-profile expiration. See the practical [Xcode installation guide](docs/XCODE_INSTALL.md)
-and [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account).
+### SideStore
 
-The canonical project/release bundle ID, `xyz.majorminor.talaria`, identifies the
-MAJOR//MINOR release. A unique self-build ID is normal: Talaria's Keychain service
-uses its **actual runtime bundle ID**, not a required literal canonical ID. A
-changed ID creates a distinct iOS app with separate local preferences/container
-and no automatic Keychain sharing. New installs simply pair with the bridge.
-Use your own Team and signing material; never copy the publisher's credentials.
+Install **Talaria-v0.1.0.ipa** from the
+[v0.1.0 release](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0)
+with official SideStore. Keep its normal Team-ID suffix behavior and refresh
+free-account signing before seven-day expiry.
 
-### Option B: SideStore
+Follow the [SideStore guide](docs/SIDESTORE_USER_GUIDE.md) for import, signing,
+verification and weekly refresh.
 
-Use [official SideStore](https://docs.sidestore.io/docs/installation/install) if you
-prefer personal sideloading without maintaining an Xcode build/install workflow.
-Paid developer membership is not required. Import **Talaria-v0.1.0.ipa** from the
-[v0.1.0 release](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0),
-keep SideStore's normal Team-ID suffix behavior, then pair with the same Mac bridge.
-An installed ID such as `xyz.majorminor.talaria.<YOUR TEAM ID>` is expected.
+**LocalDevVPN is for SideStore installation/refresh. Tailscale is for normal
+Talaria ↔ Hermes connectivity.** Restore Tailscale after every SideStore operation.
 
-**LocalDevVPN is for SideStore installation/refresh. Tailscale is for Talaria ↔
-Hermes bridge connectivity.** Switch back to Tailscale for normal Talaria use.
-With free-account signing, refresh before the seven-day profile expires.
+## Bridge setup and pairing
 
-Follow the detailed [SideStore user guide](docs/SIDESTORE_USER_GUIDE.md) for initial
-setup, import, verification, VPN switching, account limits and weekly Refresh All.
-SideStore has extensive physical update/refresh testing; the guide distinguishes
-those results from stock-build and second-account behavior not yet tested.
+Both installation paths use the same backend. Follow the canonical
+[Mac bridge setup](docs/INSTALL.md#mac-bridge-setup), then
+[pair and verify](docs/INSTALL.md#pair-and-verify) with your own scoped mobile token.
+The installer does not install Hermes or replace your existing gateways.
 
-[Installation](docs/INSTALL.md) compares both routes and provides one canonical
-bridge/pairing procedure. [Mac service setup](docs/STUDIO_SETUP.md) covers ownership,
-restart and backup.
+## Current status
 
-## Develop and test
+**v0.1.0 prerelease** is early, open-source software for personal installation,
+not an App Store release. The published IPA's canonical identity is
+`xyz.majorminor.talaria`; self-builders can choose their own ID.
 
-Open `Hermes.xcodeproj`, select the **Hermes** scheme and an iPhone simulator.
-The Xcode project/targets retain technical Hermes names. Normal launch uses the
-Studio bridge; explicit Simulation mode and test fixtures are separate.
+Physical testing covers pairing, normal and bot chat, history, reconnect and
+ordinary SideStore Refresh. Stock SideStore and a second Apple Account remain
+physically untested; see [validation boundaries](docs/RELEASE_READINESS.md#current-installation-documentation-after-publication).
+There is no APNs delivery or guaranteed execution while iOS suspends the app.
+Dangerous tool approvals remain on the Mac.
 
-```sh
-xcodebuild -project Hermes.xcodeproj -scheme Hermes \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -parallel-testing-enabled NO test
-cd hermes-mobile-bridge
-python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[test]'
-.venv/bin/python -m pytest -q
-```
+[GitHub Releases](https://github.com/majorminorlabs/hermes-talaria/releases)
+· [Troubleshooting](docs/TROUBLESHOOTING.md) · [Release notes](CHANGELOG.md)
 
-Personal signing belongs in ignored `Signing.local.xcconfig`; copy
-`Config/Signing.example.xcconfig` and set your Team locally. The current shared build configuration and release artifacts contain no personal
-Team, certificate or provisioning material. Public distribution uses a separate
-fresh-root repository; see [public release handoff](docs/PUBLIC_RELEASE_HANDOFF.md).
+## Documentation and contributing
 
-## Documentation and limits
+- [Use Talaria](docs/USING_TALARIA.md): conversations, bots, tasks and media.
+- [Mac service setup](docs/STUDIO_SETUP.md): service ownership, updates and backup.
+- [Develop and test](docs/DEVELOPING.md): build commands and local signing.
+- [Bot management](BOT_MANAGEMENT.md) · [Attachments and voice](ATTACHMENTS_AND_VOICE.md).
+- [Bridge contract](BRIDGE_API.md) · [UI architecture](UI_ARCHITECTURE.md).
 
-- [Release notes](CHANGELOG.md), [packaging](RELEASE.md) and
-  [release readiness](docs/RELEASE_READINESS.md).
-- [Troubleshooting](docs/TROUBLESHOOTING.md).
-- [Bot management](BOT_MANAGEMENT.md), [attachments and voice](ATTACHMENTS_AND_VOICE.md).
-- [Design](TALARIA_DESIGN.md), [UI architecture](UI_ARCHITECTURE.md),
-  [integration points](INTEGRATION_POINTS.md) and [bridge contract](BRIDGE_API.md).
-- [Physical acceptance](PHYSICAL_DEVICE_TEST_REPORT.md) and
-  [post-design regression evidence](TALARIA_REGRESSION_VALIDATION.md).
-
-No APNs delivery or guaranteed execution while iOS suspends the app. The Mac must
-be awake, logged in and reachable on the tailnet. Some inventories/settings remain
-unavailable, and independent native clients can conflict with live transport
-ownership. Free Personal Team provisioning expires after seven days: rebuild/reinstall with
-Xcode or refresh with SideStore, according to your chosen method. Use the
-[installation guides](docs/INSTALL.md) for signing and connection details.
+Use [GitHub Issues](https://github.com/majorminorlabs/hermes-talaria/issues) for
+bug reports and focused proposals. Include your app/bridge versions and reproduction
+steps; remove tokens, private hostnames and personal conversation data.
 
 ## License
 
-[MIT](LICENSE). Third-party components keep their own licenses; see
-[notices](THIRD_PARTY_NOTICES.md). Nothing is pushed, tagged or published by the
-release scripts.
-
-## Screenshots
-
-Simulator screenshots with fictional demonstration bots; no live account data.
-
-<img src="docs/images/bots.png" alt="Talaria Bots" width="260"> <img src="docs/images/bot-detail.png" alt="Talaria bot detail" width="260">
-
-## Start here
-
-1. [Install and pair](docs/INSTALL.md): Mac service, Tailscale, iPhone installation and host enrollment.
-2. [Use Talaria](docs/USING_TALARIA.md): chat, bots, media, dictation, tasks and research.
-3. [Build/install with Xcode](docs/XCODE_INSTALL.md) or [install/refresh with SideStore](docs/SIDESTORE_USER_GUIDE.md).
-4. [Diagnose a problem](docs/TROUBLESHOOTING.md).
+[MIT](LICENSE), by MAJOR//MINOR. Third-party components retain their own licenses;
+see [notices](THIRD_PARTY_NOTICES.md).
