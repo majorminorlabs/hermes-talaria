@@ -15,6 +15,8 @@ struct ProfileDetailView: View {
     @Environment(AppRouter.self) private var router
     @State private var skills = Resource<[Skill]>()
     @State private var editing = false
+    @State private var pickingModel = false
+    @State private var risk: RiskAction?
     @State private var creatingTask = false
     @State private var openingBotChat = false
     @State private var confirmingHide = false
@@ -29,7 +31,7 @@ struct ProfileDetailView: View {
                 ContentUnavailableView("Profile Not Found", systemImage: "person.crop.circle.badge.questionmark")
             }
         }
-        .navigationTitle(profiles.profile(profileID)?.name ?? "Bot")
+        .navigationTitle(profiles.profile(profileID)?.name ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: connection.supports(.botMode)) {
             if !connection.supports(.botMode) && connection.supports(.skills) { await skills.load { try await environment.client.skills.listSkills() } }
@@ -43,10 +45,7 @@ struct ProfileDetailView: View {
 
     private func content(_ profile: Profile) -> some View {
         let currentRun = activity.run(profile.currentRunID).flatMap { $0.state.isActive ? $0 : nil }
-        let profileConversations = conversations.conversations(forProfile: profile.id)
-        let recentRuns = activity.runs(forProfile: profile.id).filter(\.state.isTerminal)
-        let profileRoutines = routines.routines(forProfile: profile.id)
-        let openTasks = tasks.tasks(forProfile: profile.id).filter { $0.status != .completed && $0.status != .cancelled }
+        let profileRoutines = routines.sorted.filter { profiles.identity($0.profileID)?.id == profile.id }
 
         return List {
             // 1. Identity
@@ -61,46 +60,38 @@ struct ProfileDetailView: View {
                     .listRowInsets(EdgeInsets())
             }
 
-            // 3. Current status
+            Section("Now") {
+                ForEach(environment.needsYou.visible.filter { profiles.identity($0.agentID)?.id == profile.id }) { NeedsYouCard(item: $0) }
+                ForEach(environment.work.items.filter { profiles.identity($0.agentID)?.id == profile.id && [.working,.needsYou].contains($0.state) }.prefix(3)) { item in NavigationLink(value: item.route) { WorkItemRow(item: item) } }
+                if currentRun == nil { statusRow(profile) }
+            }
+            Section("Recent work") {
+                ForEach(environment.work.items.filter { profiles.identity($0.agentID)?.id == profile.id && ![.working,.needsYou].contains($0.state) }.prefix(4)) { item in NavigationLink(value: item.route) { WorkItemRow(item: item) } }
+            }
             Section {
-                if let currentRun {
-                    NavigationLink(value: Route.run(currentRun.id)) { RunRow(run: currentRun) }
-                } else {
-                    statusRow(profile)
+                Button { pickingModel = true } label: { LabeledContent("Model", value: profile.model.detailedLabel) }.accessibilityIdentifier("agent-model-row")
+                if let note = environment.agentModels.note(host: connection.activeHostID, agent: profile.id) {
+                    if profile.model.id == note.applied.id && profile.model.provider == note.applied.provider {
+                        HStack { Text("Changed from \(note.previous.displayName)").font(.footnote); Button("Revert") {
+                            Task { await revert(profile, confirmed: false) }
+                        } }.contextMenu { Button("Dismiss") { environment.agentModels.dismiss(host: connection.activeHostID, agent: profile.id) } }
+                    } else { Text("Changed on another device").font(.footnote).foregroundStyle(.secondary) }
                 }
-                ForEach(openTasks.prefix(4)) { task in
-                    NavigationLink(value: Route.task(task.id)) { TaskRow(task: task) }
-                }
-                ForEach(recentRuns.prefix(3)) { run in
-                    NavigationLink(value: Route.run(run.id)) { RecentRunRow(run: run) }
-                }
-            } header: {
-                SectionHeader("Activity")
-            }
-
-            if profile.isBotMode != true && !profileConversations.isEmpty {
-                Section {
-                    ForEach(profileConversations.prefix(4)) { conversation in
-                        NavigationLink(value: Route.conversation(conversation.id)) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(conversation.title).lineLimit(2)
-                                Text(conversation.preview)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
+                LabeledContent("Reasoning", value: "Set on your Mac")
+                Text("Hermes stores reasoning in the agent's configuration, which Talaria can't change yet.").font(.footnote).foregroundStyle(.secondary)
+                if !profileRoutines.isEmpty && connection.supports(.cron) {
+                    Button(profileRoutines.contains(where: \.isEnabled) ? "Pause all routines" : "Resume all routines") {
+                        let enabled = !profileRoutines.contains(where: \.isEnabled)
+                        risk = RiskAction(verb: enabled ? "Resume routines" : "Pause routines", effect: enabled ? "Scheduled work can run again." : "Pauses scheduled work. Existing work keeps running.", target: profile.name) {
+                            for routine in profileRoutines where routine.isEnabled != enabled { try await environment.client.schedules.setEnabled(enabled, routineID: routine.id) }
+                            await routines.refresh()
                         }
-                    }
-                } header: {
-                    SectionHeader(title: "Conversations") {
-                        if profileConversations.count > 4 {
-                            Text("\(profileConversations.count)").monospacedDigit().foregroundStyle(.tertiary)
-                        }
-                    }
+                    }.disabled(!connection.connection.isConnected)
                 }
-            }
-
-            // 4. Configuration
+                ForEach(profileRoutines) { routine in
+                    NavigationLink(value: Route.routine(routine.id)) { RoutineRow(routine: routine) }
+                }
+            } header: { SectionHeader("Runtime") }
             configurationSection(profile)
 
             // 5. Skills and tools
@@ -126,22 +117,6 @@ struct ProfileDetailView: View {
                     SectionHeader(title: "Plugins") { count(names.count) }
                 }
             }
-            if !profileRoutines.isEmpty {
-                Section {
-                    ForEach(profileRoutines) { routine in
-                        NavigationLink(value: Route.routine(routine.id)) { UpcomingRow(routine: routine) }
-                    }
-                } header: {
-                    SectionHeader("Routines")
-                }
-            } else if let names = profile.routinesMetadata, !names.isEmpty {
-                Section {
-                    ForEach(names, id: \.self) { Label($0, systemImage: "calendar.badge.clock") }
-                } header: {
-                    SectionHeader("Routines")
-                }
-            }
-
             // 6. Management
             managementSection(profile)
         }
@@ -151,12 +126,14 @@ struct ProfileDetailView: View {
                 if connection.supports(.botEdit) || environment.simulator != nil { Button("Edit") { editing = true } }
             }
         }
+        .sheet(isPresented: $pickingModel) { AgentModelPicker(profile: profile) }
+        .sheet(item: $risk) { RiskConfirmSheet(action: $0) }
         .sheet(isPresented: $editing) {
             if profile.isBotMode == true { BotEditorView(profile: profile) }
             else { EditProfileView(profile: profile, skills: skills.value ?? []) }
         }
-        .confirmationDialog("Hide this bot? Its canonical chat and history remain on Hermes. You can unhide it on Desktop.", isPresented: $confirmingHide, titleVisibility: .visible) {
-            Button("Hide Bot", role: .destructive) {
+        .confirmationDialog("Hide this agent? Its canonical thread and history remain on Hermes. You can unhide it on Desktop.", isPresented: $confirmingHide, titleVisibility: .visible) {
+            Button("Hide Agent", role: .destructive) {
                 Task { do { try await profiles.hide(profile.id); dismiss() } catch { toasts.show(error: error) } }
             }
         }
@@ -165,8 +142,14 @@ struct ProfileDetailView: View {
         }
     }
 
+    private func revert(_ profile: Profile, confirmed: Bool) async {
+        do { try await environment.agentModels.revert(profile: profile, confirmed: confirmed, environment: environment); toasts.show("Default restored") }
+        catch HermesError.botModelConfirmationText(let message) { risk = RiskAction(verb: "Restore default", effect: message, target: profile.name, high: true) { try await environment.agentModels.revert(profile: profile, confirmed: true, environment: environment); toasts.show("Default restored") } }
+        catch HermesError.botModelConfirmation { risk = RiskAction(verb: "Restore default", effect: "Hermes requires confirmation before applying this model.", target: profile.name, high: true) { try await environment.agentModels.revert(profile: profile, confirmed: true, environment: environment); toasts.show("Default restored") } }
+        catch { toasts.show(error: error) }
+    }
     private func count(_ value: Int) -> some View {
-        Text("\(value)").monospacedDigit().foregroundStyle(.tertiary)
+        Text("\(value)").monospacedDigit().foregroundStyle(.secondary)
     }
 
     private func header(_ profile: Profile) -> some View {
@@ -193,7 +176,7 @@ struct ProfileDetailView: View {
                 if profile.modelAvailable != false {
                     Label(profile.model.detailedLabel, systemImage: "cpu")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .padding(.top, 2)
                 }
@@ -210,7 +193,7 @@ struct ProfileDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Group {
                     if profile.status == .needsAttention {
-                        Text("Needs attention").foregroundStyle(Theme.attention)
+                        Text("Needs you").foregroundStyle(Theme.attention)
                     } else if let last = profile.lastActiveAt {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             Text(Format.lastActive(last, now: context.date))
@@ -227,7 +210,7 @@ struct ProfileDetailView: View {
                         .lineLimit(2)
                 }
                 if profile.isBotMode == true && profile.canonicalChatAvailable != true && !connection.supports(.botChat) {
-                    Text("Open this bot on your Mac to start its chat.")
+                    Text("Open this agent on your Mac to start its canonical thread.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -238,42 +221,18 @@ struct ProfileDetailView: View {
     }
 
     private func actions(_ profile: Profile) -> some View {
-        HStack(spacing: 10) {
-            Button {
-                if profile.isBotMode == true {
-                    guard !openingBotChat else { return }
-                    openingBotChat = true
-                    environment.toasts.perform {
-                        defer { openingBotChat = false }
-                        if let chat = try await environment.client.profiles.canonicalConversation(profileID: profile.id) {
-                            conversations.apply(.conversationUpserted(chat))
-                            router.open(.conversation(chat.id))
-                        }
-                    }
-                } else { router.open(.newConversation(NewChatSeed(profileID: profile.id))) }
-            } label: {
-                if openingBotChat {
-                    ProgressView().controlSize(.small)
-                    Text("Opening…").frame(maxWidth: .infinity)
-                } else {
-                    Label("Chat", systemImage: "bubble.left.fill").frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!connection.supports(.sessions) || (profile.isBotMode == true &&
-                (!connection.connection.isConnected || (profile.canonicalChatAvailable != true && !connection.supports(.botChat)) || openingBotChat)))
-
-            if profile.isBotMode != true && connection.supports(.kanban) {
-                Button {
-                    creatingTask = true
-                } label: {
-                    Label("Start Task", systemImage: "checklist").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(!connection.connection.isConnected)
-            }
+        HStack {
+            Button("Ask \(profile.name)") { router.askSeed = AskSeed(agentID: profile.id) }
+                .buttonStyle(.borderedProminent).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("agent-ask")
+            Button("Voice input", systemImage: "mic") {
+                environment.voice.start(capture: false, simulated: environment.simulator != nil)
+                router.askSeed = AskSeed(agentID: profile.id, voice: true)
+            }.labelStyle(.iconOnly).frame(width: 44, height: 44)
+                .modifier(PushToTalk(start: {
+                    environment.voice.start(capture: false, simulated: environment.simulator != nil)
+                    router.heldVoiceAsk = AskSeed(agentID: profile.id, voice: true)
+                }, move: environment.voice.move, release: environment.voice.release, tap: { environment.voice.start(capture: false, simulated: environment.simulator != nil); environment.router.askSeed = AskSeed(agentID: profile.id, voice: true) }))
         }
-        .controlSize(.large)
     }
 
     @ViewBuilder
@@ -286,7 +245,7 @@ struct ProfileDetailView: View {
                         VStack(alignment: .trailing, spacing: 1) {
                             Text(profile.model.displayName)
                             if !profile.model.provider.isEmpty {
-                                Text(profile.model.provider).font(.caption).foregroundStyle(.tertiary)
+                                Text(profile.model.provider).font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         .foregroundStyle(.secondary)
@@ -301,11 +260,6 @@ struct ProfileDetailView: View {
                         Text(summary).font(.footnote).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 2)
-                }
-                if profile.isBotMode != true && connection.supports(.memory) {
-                    NavigationLink(value: Route.memory) {
-                        LabeledContent("Memory entries", value: profile.memoryEntryCount.map(String.init) ?? "—")
-                    }
                 }
                 if let path = profile.configPath {
                     KeyValueRow(label: "Config", value: path, monospaced: true)
@@ -342,7 +296,7 @@ struct ProfileDetailView: View {
             Section {
                 if canDuplicate {
                     Button {
-                        Task { do { try await profiles.duplicate(profile.id); toasts.show("Bot duplicated") } catch { toasts.show(error: error) } }
+                        Task { do { try await profiles.duplicate(profile.id); toasts.show("Agent duplicated") } catch { toasts.show(error: error) } }
                     } label: {
                         Label("Duplicate", systemImage: "plus.square.on.square")
                     }
@@ -355,7 +309,7 @@ struct ProfileDetailView: View {
             } header: {
                 SectionHeader("Management")
             } footer: {
-                if canHide { Text("Hiding keeps the bot's chat and history on Hermes. Unhide it from Hermes Desktop.") }
+                if canHide { Text("Hiding keeps the agent's thread and history on Hermes. Unhide it from Hermes Desktop.") }
             }
         }
     }

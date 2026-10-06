@@ -151,6 +151,11 @@ final class ConversationListStore {
         try await client.conversations.deleteConversation(id: id)
     }
 
+    func setArchived(_ archived: Bool, _ id: String) async throws {
+        try await client.conversations.setArchived(archived, conversationID: id)
+        if var c = conversations[id] { c.isArchived = archived; conversations[id] = c }
+    }
+
     func setPinned(_ pinned: Bool, _ id: String) async throws {
         try await client.conversations.setPinned(pinned, conversationID: id)
     }
@@ -212,6 +217,7 @@ final class ConversationModel {
     }
 
     var composerMode: ComposerMode {
+        if conversationID != nil && activity.runs.values.contains(where: { $0.conversationID == conversationID && $0.state == .unknown }) { return .busy }
         guard let run = activeRun else { return .send }
         if let approval = pendingApproval, approval.isClarification, approval.availability.isActionable, (approval.expiresAt ?? .distantPast) > .now { return .clarify }
         if run.canSteer && connection.supports(.steering) { return .steer }

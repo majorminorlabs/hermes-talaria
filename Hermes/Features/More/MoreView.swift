@@ -10,14 +10,12 @@ struct MoreView: View {
         (.skills, "Skills", "book.closed", .skills),
         (.tools, "Tools", "wrench.and.screwdriver", .tools),
         (.mcp, "MCP Servers", "point.3.connected.trianglepath.dotted", .mcp),
-        (.memory, "Memory", "brain", .memory),
-        (.integrations, "Integrations", "app.connected.to.app.below.fill", .integrations),
     ]
 
     var body: some View {
         let available = hermesDestinations.filter { connection.supports($0.3) }
         let unavailable = hermesDestinations.filter { !connection.supports($0.3) }.map(\.1)
-            + (connection.supports(.logs) ? [] : ["Logs"])
+
 
         List {
             Section {
@@ -41,6 +39,7 @@ struct MoreView: View {
                         }
                     }
                 }
+                HostSummaryRows(status: connection.status)
                 NavigationLink(value: Route.hosts) {
                     LabeledContent {
                         Text("\(connection.hosts.count)").monospacedDigit()
@@ -63,9 +62,6 @@ struct MoreView: View {
             }
 
             Section {
-                if connection.supports(.logs) {
-                    NavigationLink(value: Route.logs) { row("Logs", "doc.text.magnifyingglass") }
-                }
                 NavigationLink(value: Route.capabilities) {
                     LabeledContent {
                         Text("\(connection.capabilities.count) of \(HermesCapability.allCases.count)").monospacedDigit()
@@ -82,6 +78,7 @@ struct MoreView: View {
             }
 
             Section {
+                NavigationLink(value: Route.outbox) { row("Outbox", "tray") }
                 NavigationLink(value: Route.settings) { row("Settings", "gearshape") }
             }
 
@@ -91,7 +88,7 @@ struct MoreView: View {
             }
         }
         .listSectionSpacing(.compact)
-        .navigationTitle("More")
+        .navigationTitle("Studio")
     }
 
     private func row(_ title: String, _ symbol: String) -> some View {

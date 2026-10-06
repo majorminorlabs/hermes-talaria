@@ -58,7 +58,7 @@ struct SectionHeader<Trailing: View>: View {
                 .font(.footnote.weight(.semibold))
                 .textCase(.uppercase)
                 .tracking(0.4)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
                 // Read as written, not letter-by-letter capitals.
                 .accessibilityLabel(Text(title))
                 .accessibilityAddTraits(.isHeader)
@@ -93,7 +93,7 @@ struct ToastOverlay: ViewModifier {
     func body(content: Content) -> some View {
         content.overlay(alignment: .top) {
             if let toast = toasts.current {
-                Label(toast.message, systemImage: toast.symbol)
+                HStack { Label(toast.message, systemImage: toast.symbol); if let title = toast.actionTitle { Button(title) { toasts.action?() } } }
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(toast.isError ? Theme.failure : .primary)
                     .padding(.horizontal, 16)

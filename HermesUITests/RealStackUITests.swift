@@ -10,20 +10,35 @@ final class RealStackUITests: XCTestCase {
         continueAfterFailure = false
         let app=XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout:10))
-        XCTAssertTrue(app.staticTexts["Connected"].firstMatch.waitForExistence(timeout:20))
-        app.navigationBars["Talaria"].buttons["New Chat"].tap()
-        let composer=app.textFields.firstMatch
-        XCTAssertTrue(composer.waitForExistence(timeout:5))
-        composer.tap();composer.typeText("Safe local UI hello")
-        app.buttons["Send"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:20))
+        app.buttons["ask-bar"].tap()
+        let composer = app.textFields["ask-text"]
+        XCTAssertTrue(composer.waitForExistence(timeout:5)); composer.tap(); composer.typeText("Safe local UI hello")
+        app.buttons["ask-send"].tap()
+        XCTAssertTrue(app.buttons["Open"].waitForExistence(timeout:5)); app.buttons["Open"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Local Studio stream complete'")).firstMatch.waitForExistence(timeout:20))
-        app.navigationBars.buttons["Chat"].firstMatch.tap()
-        app.tabBars.buttons["Bots"].tap()
-        XCTAssertTrue(app.staticTexts["Default Profile"].firstMatch.waitForExistence(timeout:10))
-        app.tabBars.buttons["Tasks"].tap()
-        app.buttons["Scheduled"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Local scheduled work"].firstMatch.waitForExistence(timeout:10))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.tabBars.buttons["Agents"].tap()
+        let worker = app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Research Worker' ")).firstMatch
+        XCTAssertTrue(worker.waitForExistence(timeout:10)); worker.tap()
+        app.buttons["agent-ask"].tap()
+        let agentComposer = app.textFields["ask-text"]
+        XCTAssertTrue(agentComposer.waitForExistence(timeout:5)); agentComposer.tap(); agentComposer.typeText("Safe independent Agent UI hello")
+        app.buttons["ask-send"].tap()
+        XCTAssertTrue(app.buttons["Open"].waitForExistence(timeout:5)); app.buttons["Open"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Local Studio stream complete'")).firstMatch.waitForExistence(timeout:20))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.buttons["capture-button"].tap()
+        let capture = app.textFields["capture-text"]
+        XCTAssertTrue(capture.waitForExistence(timeout:5)); capture.tap(); capture.typeText("  Production UI *capture*\nKeep exact text  ")
+        app.buttons["capture-save"].tap()
+        XCTAssertTrue(app.staticTexts["Saved to Hermes"].waitForExistence(timeout:10))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.tabBars.buttons["Now"].tap()
+        app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Studio connection' ")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout:5))
+
     }
 }
 
@@ -36,8 +51,8 @@ final class StudioBotUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Bots"].waitForExistence(timeout: 15))
-        app.tabBars.buttons["Bots"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["Agents"].tap()
         return app
     }
 
@@ -61,7 +76,7 @@ final class StudioBotUITests: XCTestCase {
         }
         XCTAssertTrue(found, "Research Orchestrator attached skill")
         let skills = XCTAttachment(screenshot: app.screenshot()); skills.name = "Research Orchestrator skills"; skills.lifetime = .keepAlways; add(skills)
-        let chatButton = app.collectionViews.buttons["Chat"].firstMatch
+        let chatButton = app.buttons["agent-ask"].firstMatch
         for _ in 0..<30 where !chatButton.isHittable { app.swipeDown() }
         XCTAssertTrue(chatButton.exists)
         if chatButton.isEnabled {
@@ -93,8 +108,8 @@ final class WritableStudioBotUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication(); app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Bots"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["Bots"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Agents"].tap()
         return app
     }
     private func bot(_ name: String, _ app: XCUIApplication) -> XCUIElement {
@@ -105,7 +120,7 @@ final class WritableStudioBotUITests: XCTestCase {
     }
     private func open(_ name: String, _ app: XCUIApplication) {
         XCTAssertTrue(bot(name, app).waitForExistence(timeout: 30)); bot(name, app).tap()
-        let chat = app.collectionViews.buttons["Chat"].firstMatch
+        let chat = app.buttons["agent-ask"].firstMatch
         XCTAssertTrue(chat.waitForExistence(timeout: 15)); XCTAssertTrue(chat.isEnabled); chat.tap()
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 30) || app.textViews.firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Studio Bot Chat · Read only"].exists)
@@ -132,7 +147,7 @@ final class WritableStudioBotUITests: XCTestCase {
         }
         evidence("Research Orchestrator skill scroll result", app)
         XCTAssertTrue(found); evidence("Attached research-terminal on iPhone", app)
-        let chat = app.collectionViews.buttons["Chat"].firstMatch
+        let chat = app.buttons["agent-ask"].firstMatch
         for _ in 0..<35 where !chat.isHittable { app.swipeDown() }
         XCTAssertTrue(chat.isEnabled); chat.tap()
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 30) || app.textViews.firstMatch.exists)
@@ -140,10 +155,10 @@ final class WritableStudioBotUITests: XCTestCase {
         XCUIDevice.shared.press(.home); app.activate()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'MOBILE_RESEARCH_CHECK_DONE'")).firstMatch.waitForExistence(timeout: 30))
         app.terminate(); app.launch()
-        app.tabBars.buttons["Bots"].tap(); open("Research Orchestrator", app)
+        app.tabBars.buttons["Agents"].tap(); open("Research Orchestrator", app)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'MOBILE_RESEARCH_CHECK_DONE'")).firstMatch.waitForExistence(timeout: 30))
         evidence("Research Orchestrator history after relaunch", app)
-        app.tabBars.buttons["Chat"].tap()
+        app.tabBars.buttons["Threads"].tap()
         let listed = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Research Orchestrator'")).firstMatch
         XCTAssertTrue(listed.waitForExistence(timeout: 30)); listed.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'MOBILE_RESEARCH_CHECK_DONE'")).firstMatch.waitForExistence(timeout: 30))
@@ -163,7 +178,7 @@ final class WritableStudioBotUITests: XCTestCase {
         let response = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'MOBILE_RESEARCH_AUTH_OK'")).firstMatch
         XCTAssertTrue(response.label.contains("completed"), "Expected the existing completed record")
         app.terminate(); app.launch()
-        app.tabBars.buttons["Bots"].tap(); open("Research Orchestrator", app)
+        app.tabBars.buttons["Agents"].tap(); open("Research Orchestrator", app)
         XCTAssertTrue(response.waitForExistence(timeout: 30))
         evidence("Authenticated Research Terminal result after relaunch", app)
     }

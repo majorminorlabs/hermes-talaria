@@ -1,13 +1,26 @@
 import SwiftUI
 
-enum AppTab: Hashable {
-    case home, chat, tasks, bots, more
+enum AppTab: Hashable { case now, threads, agents }
+struct AskSeed: Identifiable, Hashable {
+    var id = UUID()
+    var agentID: String? = nil
+    var text = ""
+    var model: ModelRef? = nil
+    var voice = false
+}
+struct CaptureSeed: Identifiable, Hashable {
+    var id = UUID()
+    var text = ""
+    var voice = false
 }
 
 /// Every pushable destination. All tabs share one destination table so any
 /// screen (Run Detail, a conversation, a profile…) can be reached from anywhere.
 enum Route: Hashable {
     case run(String)
+    case thread(String)
+    case agent(String)
+    case board, scheduled, studio, outbox, snoozed
     case approval(String)
     case conversation(String)
     case newConversation(NewChatSeed)
@@ -17,15 +30,11 @@ enum Route: Hashable {
     case hosts
     case host(String)
     case usage
-    case memory
-    case memoryEntry(MemoryEntry)
     case skills
     case skill(Skill)
     case tools
     case mcp
     case mcpServer(MCPServer)
-    case integrations
-    case logs
     case settings
     case capabilities
 }
@@ -37,64 +46,47 @@ struct NewChatSeed: Hashable {
 
 @Observable
 final class AppRouter {
-    var selectedTab: AppTab = .home
-    var homePath: [Route] = []
-    var chatPath: [Route] = []
-    var tasksPath: [Route] = []
-    var botsPath: [Route] = []
-    var morePath: [Route] = []
-    /// Lets other screens deep-link into a Tasks segment.
-    var tasksSegment: TasksSegment = .running
-
-    /// Push onto the current tab's stack.
+    var selectedTab: AppTab = .now
+    var nowPath: [Route] = []
+    var threadsPath: [Route] = []
+    var agentsPath: [Route] = []
+    var askSeed: AskSeed?
+    var captureSeed: CaptureSeed?
+    var heldVoiceAsk: AskSeed?
+    var heldVoiceCapture = false
+    var needsFocusID: String?
+    var stepsRunID: String?
     func open(_ route: Route) {
         switch selectedTab {
-        case .home: homePath.append(route)
-        case .chat: chatPath.append(route)
-        case .tasks: tasksPath.append(route)
-        case .bots: botsPath.append(route)
-        case .more: morePath.append(route)
+        case .now: nowPath.append(route)
+        case .threads: threadsPath.append(route)
+        case .agents: agentsPath.append(route)
         }
     }
-
-    /// Jump to Chat and start a new conversation, optionally with a profile.
-    func startNewChat(profileID: String? = nil) {
-        selectedTab = .chat
-        chatPath = [.newConversation(NewChatSeed(profileID: profileID))]
-    }
-
-    func showTasks(_ segment: TasksSegment) {
-        tasksSegment = segment
-        tasksPath = []
-        selectedTab = .tasks
-    }
-
-    func openConversation(_ id: String) {
-        selectedTab = .chat
-        chatPath = [.conversation(id)]
-    }
-
+    func openConversation(_ id: String) { open(.thread(id)) }
     func path(for tab: AppTab) -> Binding<[Route]> {
-        Binding(
-            get: {
-                switch tab {
-                case .home: self.homePath
-                case .chat: self.chatPath
-                case .tasks: self.tasksPath
-                case .bots: self.botsPath
-                case .more: self.morePath
-                }
-            },
-            set: { newValue in
-                switch tab {
-                case .home: self.homePath = newValue
-                case .chat: self.chatPath = newValue
-                case .tasks: self.tasksPath = newValue
-                case .bots: self.botsPath = newValue
-                case .more: self.morePath = newValue
-                }
-            }
-        )
+        Binding(get: {
+            switch tab { case .now: self.nowPath; case .threads: self.threadsPath; case .agents: self.agentsPath }
+        }, set: { value in
+            switch tab { case .now: self.nowPath = value; case .threads: self.threadsPath = value; case .agents: self.agentsPath = value }
+        })
+    }
+    func handle(_ url: URL) {
+        guard url.scheme == "talaria" else { return }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
+        switch url.host {
+        case "now": selectedTab = .now; nowPath = []
+        case "thread":
+            if let id = parts.first { selectedTab = .now; nowPath = [.thread(id)]; if parts.last == "steps" { stepsRunID = value("run") } }
+        case "agent": if let id = parts.first { selectedTab = .agents; agentsPath = [.agent(id)] }
+        case "ask": askSeed = AskSeed(agentID: value("agent"), text: value("text") ?? "", voice: parts.first == "voice")
+        case "capture": captureSeed = CaptureSeed(text: value("text") ?? "", voice: parts.first == "voice")
+        case "studio": open(.studio)
+        case "needs": selectedTab = .now; nowPath = []; needsFocusID = parts.first
+        default: break
+        }
     }
 }
 
@@ -106,13 +98,16 @@ final class ToastCenter {
         var message: String
         var symbol: String
         var isError: Bool
+        var actionTitle: String? = nil
     }
 
     private(set) var current: Toast?
+    private(set) var action: (() -> Void)?
     private var dismissTask: Task<Void, Never>?
 
-    func show(_ message: String, symbol: String = "checkmark.circle.fill") {
-        present(Toast(message: message, symbol: symbol, isError: false))
+    func show(_ message: String, symbol: String = "checkmark.circle.fill", actionTitle: String? = nil, action: (() -> Void)? = nil) {
+        self.action = action
+        present(Toast(message: message, symbol: symbol, isError: false, actionTitle: actionTitle))
     }
 
     func show(error: any Error) {
@@ -136,7 +131,7 @@ final class ToastCenter {
         current = toast
         dismissTask?.cancel()
         dismissTask = Task {
-            try? await Task.sleep(for: .seconds(toast.isError ? 4 : 2.2))
+            try? await Task.sleep(for: .seconds(toast.isError || toast.actionTitle != nil ? 4 : 2.2))
             guard !Task.isCancelled else { return }
             current = nil
         }

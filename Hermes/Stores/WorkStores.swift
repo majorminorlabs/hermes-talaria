@@ -44,6 +44,7 @@ final class ProfileStore {
     /// so they wear its face instead of a generic monogram. Presentation only.
     func identity(_ id: String?) -> Profile? {
         if let exact = profile(id) { return exact }
+        if let id { let native = profiles.values.filter { $0.profileKey == id }; if native.count == 1 { return native.first } }
         guard id == nil || id == Profile.defaultID else { return nil }
         return profiles.values.first { $0.isDefault }
     }

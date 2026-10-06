@@ -20,7 +20,7 @@ struct ApprovalCard: View {
     @State private var resolvedCount = 0
 
     var body: some View {
-        let availability = approval.effectiveAvailability(remoteApprovalsSupported: connection.supports(.approvals))
+        let availability = approval.isClarification ? approval.effectiveAvailability(remoteApprovalsSupported: false) : ApprovalAvailability.unavailableRemotely("Approve on your Mac. Talaria cannot safely target this approval.")
         let tint = availability == .expired ? Color.secondary : Theme.attention
 
         VStack(alignment: .leading, spacing: 12) {

@@ -90,7 +90,9 @@ struct DomainTests {
 
     @Test func approvalAvailability() {
         let approvals = MockFixtures.standard().approvals
-        let actionable = approvals.first { $0.id == "a-rm" }!
+        var actionable = approvals.first { $0.id == "a-rm" }!
+        // The domain still supports a future exact-target bridge; the current fixture is Mac-only.
+        actionable.availability = .actionable
         let hostOnly = approvals.first { $0.id == "a-index" }!
         #expect(actionable.effectiveAvailability(remoteApprovalsSupported: true).isActionable)
         #expect(!actionable.effectiveAvailability(remoteApprovalsSupported: false).isActionable)
@@ -120,7 +122,7 @@ struct MockBackendTests {
     @Test func homeSummaryAggregatesAttention() async throws {
         let backend = makeBackend()
         let summary = try await backend.homeSummary()
-        #expect(summary.activeRuns.count == 4)
+        #expect(summary.activeRuns.count == backend.runs.values.filter { $0.state.isActive }.count)
         #expect(summary.attention.contains { $0.kind == .approval })
         #expect(summary.attention.contains { $0.kind == .blockedTask })
         #expect(summary.attention.contains { $0.kind == .failedRun })
@@ -149,15 +151,13 @@ struct MockBackendTests {
         }
     }
 
-    @Test func approvingResumesRun() async throws {
+    @Test func answeringExactClarificationCompletesWork() async throws {
         let backend = makeBackend()
-        backend.startSimulation()
-        try await Task.sleep(for: .milliseconds(50))
-        try await backend.resolveApproval(id: "a-rm", decision: .approveOnce)
-        try await Task.sleep(for: .seconds(2))
-        let run = try #require(backend.runs["r-ios"])
+        try await backend.answerClarification(id: "q-choices", answer: "Grainger")
+        let run = try #require(backend.runs["r-question-choices"])
         #expect(run.state == .completed)
-        #expect(run.events.contains { $0.kind == .approvalResolved })
+        #expect(backend.approvals["q-choices"] == nil)
+        #expect(run.resultSummary == "Answer received: Grainger")
     }
 
     @Test func replayDeliversMissedEvents() async throws {

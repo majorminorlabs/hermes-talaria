@@ -31,7 +31,7 @@ nonisolated struct Run: Identifiable, Hashable, Codable, Sendable {
 
     var canStop: Bool { stopSupported ?? state.canStop }
     var canSteer: Bool { steerSupported ?? state.canSteer }
-    var canRetry: Bool { retrySupported ?? state.canRetry }
+    var canRetry: Bool { state != .unknown && (retrySupported ?? state.canRetry) }
 
     /// Highest event sequence seen. Updates with a lower value are stale.
     var lastSequence: Int { events.last?.sequence ?? 0 }
@@ -98,15 +98,17 @@ nonisolated enum RunState: String, Codable, Sendable, CaseIterable {
     case cancelled
     /// The phone lost contact; the run may still be executing on the host.
     case disconnected
+    /// The bridge cannot establish the outcome; never treat this as offline or retryable.
+    case unknown
 
     var isActive: Bool {
         switch self {
         case .queued, .running, .waitingForApproval, .waitingForInput, .steeringPending, .stopping, .disconnected: true
-        case .completed, .failed, .cancelled: false
+        case .completed, .failed, .cancelled, .unknown: false
         }
     }
 
-    var isTerminal: Bool { !isActive }
+    var isTerminal: Bool { self == .completed || self == .failed || self == .cancelled }
 
     var needsUser: Bool { self == .waitingForApproval || self == .waitingForInput }
 
@@ -123,16 +125,17 @@ nonisolated enum RunState: String, Codable, Sendable, CaseIterable {
 
     var label: String {
         switch self {
-        case .queued: "Queued"
-        case .running: "Running"
-        case .waitingForApproval: "Waiting for approval"
-        case .waitingForInput: "Waiting for input"
-        case .steeringPending: "Steering pending"
+        case .queued: "Starting"
+        case .running: "Working"
+        case .waitingForApproval: "Needs you on Mac"
+        case .waitingForInput: "Needs you"
+        case .steeringPending: "Working · instruction sent"
         case .stopping: "Stopping"
-        case .completed: "Completed"
+        case .completed: "Done"
         case .failed: "Failed"
-        case .cancelled: "Cancelled"
-        case .disconnected: "Disconnected"
+        case .cancelled: "Stopped"
+        case .disconnected: "Last known: working"
+        case .unknown: "Outcome unknown"
         }
     }
 
@@ -157,6 +160,7 @@ nonisolated enum RunState: String, Codable, Sendable, CaseIterable {
         case .failed: "xmark.octagon.fill"
         case .cancelled: "minus.circle.fill"
         case .disconnected: "wifi.slash"
+        case .unknown: "questionmark.circle"
         }
     }
 }
@@ -180,7 +184,7 @@ nonisolated enum RunOutcome: String, Codable, Sendable, CaseIterable, Identifiab
         switch self {
         case .succeeded: "Completed"
         case .failed: "Failed"
-        case .cancelled: "Cancelled"
+        case .cancelled: "Stopped"
         }
     }
 

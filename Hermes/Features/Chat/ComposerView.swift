@@ -69,6 +69,9 @@ struct ComposerView: View {
 
                 trailingButton
             }
+            if ![.idle,.cancelled].contains(environment.voice.phase) {
+                VoiceOverlay(session: environment.voice, send: { words,_ in model.draft = words; if model.composerMode != .clarify { submit() } }, edit: { model.draft = $0; focus.wrappedValue = true }, allowAutoSend: model.composerMode != .clarify && connection.connection.isConnected, targetName: profiles.name(model.configuration.profileID))
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
@@ -145,19 +148,22 @@ struct ComposerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 4)
         case .steer:
-            Label("Instructions go to the running task", systemImage: "arrow.turn.down.right")
+            Label("Goes to the current work. Hermes reads it at its next step.", systemImage: "arrow.turn.down.right")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.steering)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
         case .busy:
             if let run = model.activeRun {
-                Label(run.state == .waitingForApproval ? "Waiting for your approval above" : run.state.label,
+                Label(run.state == .waitingForApproval ? "Approve on your Mac" : run.state.label,
                       systemImage: run.state.symbol)
                     .font(.caption)
                     .foregroundStyle(run.state.tint)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 4)
+            } else {
+                Text("Hermes is still settling this thread").font(.footnote).foregroundStyle(.secondary)
+                Button("New thread with this ask") { environment.router.askSeed = AskSeed(agentID: model.configuration.profileID, text: model.draft) }
             }
         }
     }
@@ -186,16 +192,18 @@ struct ComposerView: View {
             Image(systemName: dictation.isRecording ? "stop.circle.fill" : "mic")
                 .font(.body.weight(dictation.isRecording ? .semibold : .regular))
                 .foregroundStyle(dictation.isRecording ? Theme.failure : .secondary)
-                .frame(width: 36, height: 38)
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
                 .contentTransition(.symbolEffect(.replace))
         }
+        .modifier(PushToTalk(start: { environment.voice.start(capture: false, simulated: environment.simulator != nil) }, move: environment.voice.move, release: environment.voice.release, tap: toggleDictation))
         .accessibilityLabel(dictation.isRecording ? "Stop dictation" : "Voice input")
         .disabled(!connection.connection.isConnected || model.isSending || loadingMedia || dictation.isStarting)
     }
 
     private var attachMenu: some View {
         Menu {
+            Button("Capture", systemImage: "tray.and.arrow.down") { environment.router.captureSeed = CaptureSeed() }
             if connection.supports(.imageUpload) { Button("Photo Library", systemImage: "photo.on.rectangle") { showingPhotos = true } }
             Button("Files", systemImage: "folder") { showingFiles = true }
             if connection.supports(.imageUpload) { Button("Camera", systemImage: "camera") {
@@ -205,7 +213,7 @@ struct ComposerView: View {
             Image(systemName: "plus")
                 .font(.body.weight(.medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .background(Color(uiColor: .secondarySystemBackground), in: Circle())
         }
         .accessibilityLabel("Add attachment")
@@ -222,7 +230,7 @@ struct ComposerView: View {
                     .font(.system(size: 34))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Theme.failure)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!(model.activeRun?.canStop ?? false) || !connection.supports(.stop) || !connection.connection.isConnected)
             .accessibilityLabel("Stop run")
@@ -232,7 +240,7 @@ struct ComposerView: View {
                     .font(.system(size: 34))
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(.white, model.composerMode == .steer ? Theme.steering : Color.accentColor)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!model.canSend || loadingMedia || dictation.isRecording)
             .accessibilityLabel(model.composerMode == .steer ? "Send instruction" : "Send")
@@ -294,8 +302,8 @@ struct ComposerView: View {
         if !connection.connection.isConnected { return "Not connected to \(connection.activeHost?.name ?? "your Mac")" }
         return switch model.composerMode {
         case .clarify: "Your answer…"
-        case .send: "Message \(profiles.name(model.configuration.profileID))"
-        case .steer: "Send an instruction…"
+        case .send: "Ask a follow-up…"
+        case .steer: "Add an instruction…"
         case .busy: "Hermes is waiting…"
         }
     }

@@ -224,14 +224,16 @@ struct HostEditorView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
                 }
                 Section {
-                    TextField("Name", text: $name)
+                    TextField("Name", text: $name).accessibilityIdentifier("host-name")
                     TextField("Bridge HTTPS URL", text: $address)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
+                        .accessibilityIdentifier("host-address")
                         .font(.body.monospaced())
                     TextField("Port", text: $port)
                         .keyboardType(.numberPad)
+                        .accessibilityIdentifier("host-port")
                         .font(.body.monospaced())
                     if environment.simulator == nil {
                         SecureField("Bridge token", text: $token)

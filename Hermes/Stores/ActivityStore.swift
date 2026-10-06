@@ -47,7 +47,7 @@ final class ActivityStore {
     }
 
     var finishedRuns: [Run] {
-        runs.values.filter(\.state.isTerminal).sorted { ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt) }
+        runs.values.filter { $0.state.isTerminal || $0.state == .unknown }.sorted { ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt) }
     }
 
     func run(_ id: String?) -> Run? { id.flatMap { runs[$0] } }
@@ -108,7 +108,22 @@ final class ActivityStore {
     /// Ignores snapshots older than what we already have; replayed and live
     /// events can overlap after a reconnect.
     private func merge(_ run: Run) {
-        if let existing = runs[run.id], existing.lastSequence > run.lastSequence { return }
+        if let existing = runs[run.id] {
+            guard existing.lastSequence <= run.lastSequence else { return }
+            if existing.state.isTerminal && existing.state != run.state {
+                // A snapshot cannot undo termination. A later explicit completion
+                // can report a finish after a stop, but must remain visible as such.
+                guard run.state == .completed, run.lastSequence > existing.lastSequence,
+                      run.events.contains(where: { $0.kind == .completed && $0.sequence > existing.lastSequence }) else { return }
+                var corrected = run
+                if existing.state == .cancelled {
+                    corrected.events.append(RunEvent(sequence: run.lastSequence, kind: .output,
+                        title: "Hermes reported this finished after you stopped it"))
+                }
+                runs[run.id] = corrected
+                return
+            }
+        }
         runs[run.id] = run
     }
 

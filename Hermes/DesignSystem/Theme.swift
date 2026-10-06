@@ -6,10 +6,14 @@ import UIKit
 /// Desktop's `--ui-green/red` family, deepened where needed so small text
 /// clears 4.5:1 on light backgrounds and lifted for dark mode.
 enum Theme {
+    static let secondaryText = adaptive(light: 0x55545E, dark: 0xB9B7C2)
     static let running = Color.accentColor
     static let attention = adaptive(light: 0xB9530C, dark: 0xF5A04A)
     static let failure = adaptive(light: 0xCF2D56, dark: 0xE75E78)
     static let success = adaptive(light: 0x1A7F5C, dark: 0x55A583)
+    static let attentionWash = Color(uiColor: UIColor { traits in
+        Theme.adaptiveUIColor(light: 0xB9530C, dark: 0xF5A04A).resolvedColor(with: traits).withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.12 : 0.07)
+    })
     static let steering = Color.indigo
     static let idle = Color.secondary
 
@@ -53,7 +57,7 @@ extension RunState {
         case .completed: Theme.success
         case .failed: Theme.failure
         case .cancelled: .secondary
-        case .disconnected: .secondary
+        case .disconnected, .unknown: .secondary
         }
     }
 }

@@ -60,6 +60,8 @@ final class SimulationControls {
     var latency: SimulatedLatency = .fast
     var failRequests = false
     var emptyData = false
+    var nextSendUncertain = false
+    var failCaptureSync = false
     var runSpeed: Double = 1
     var disabledCapabilities: Set<HermesCapability> = [] {
         didSet { onCapabilitiesChanged?() }

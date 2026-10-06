@@ -25,129 +25,18 @@ final class ScreenTourTests: XCTestCase {
     }
 
     func testTour() throws {
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout: 10))
-        settle(2)
-        shot("01-home")
-        app.swipeUp()
-        settle()
-        shot("02-home-scrolled")
-        app.swipeDown()
-        app.swipeDown()
-
-        // Run detail from Home.
-        if tapText("Analyzing provider benchmark") {
-            settle()
-            shot("03-run-detail")
-            app.swipeUp()
-            settle()
-            shot("04-run-detail-timeline")
-            back()
-        }
-
-        // Non-actionable approval detail.
-        if tapText("Dex needs approval") {
-            settle()
-            shot("05-approval-unavailable")
-            back()
-        }
-
-        // Chat.
-        tab("Chat")
-        settle()
-        shot("10-chat-list")
-        if tapText("Researcher") {
-            settle(1.5)
-            shot("11-conversation-live-run")
-            back()
-        }
-        if tapText("Caddy") {
-            settle(1.5)
-            shot("12-conversation-approval")
-            back()
-        }
-        if tapText("This week in agent research") {
-            settle(1.5)
-            shot("13-conversation-markdown-image")
-            app.swipeDown()
-            settle()
-            shot("14-conversation-markdown-top")
-            back()
-        }
-        if tapText("Explain KV cache quantization") {
-            settle(1.5)
-            shot("15-conversation-code-table")
-            back()
-        }
-        app.navigationBars.buttons["New Chat"].firstMatch.tap()
-        settle()
-        shot("16-new-chat")
-        back()
-
-        // Tasks.
-        tab("Tasks")
-        settle()
-        shot("20-tasks-running")
-        segment("Scheduled")
-        shot("21-tasks-scheduled")
-        if tapText("Nightly research sweep") {
-            settle()
-            shot("22-routine-detail")
-            back()
-        }
-        segment("Kanban")
-        shot("23-tasks-kanban")
-        if tapText("Blocked") {
-            settle()
-            shot("24-kanban-blocked")
-            if tapText("Deploy docs site to Fly.io") {
-                settle()
-                shot("25-task-detail-blocked")
-                back()
-            }
-        }
-        if app.buttons["Show board"].exists {
-            app.buttons["Show board"].tap()
-            settle()
-            shot("26-kanban-board")
-            app.buttons["Show list"].tap()
-        }
-        segment("Completed")
-        shot("27-tasks-completed")
-
-        // Bots.
-        tab("Bots")
-        settle()
-        shot("30-bots")
-        if tapText("Caddy") {
-            settle()
-            shot("31-profile-caddy")
-            app.swipeUp()
-            settle()
-            shot("32-profile-caddy-scrolled")
-            back()
-        }
-
-        // More.
-        tab("More")
-        settle()
-        shot("40-more")
-        for (label, name) in [("Usage", "41-usage"), ("Memory", "42-memory"), ("Skills", "43-skills"), ("Tools", "44-tools"),
-                              ("MCP Servers", "45-mcp"), ("Integrations", "46-integrations"), ("Logs", "47-logs"),
-                              ("Mac Studio", "48-host-detail"), ("Settings", "49-settings")] {
-            if tapText(label) {
-                settle(1.2)
-                shot(name)
-                if label == "Settings" {
-                    app.swipeUp()
-                    settle()
-                    shot("50-settings-scrolled")
-                }
-                back()
-            }
-        }
+        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout: 10))
+        settle(2); shot("01-now"); app.swipeUp(); shot("02-now-working"); app.swipeDown()
+        tab("Threads"); settle(); shot("10-threads")
+        if tapText("Researcher") { settle(); shot("11-thread-working"); if app.buttons["steps-button"].firstMatch.exists { app.buttons["steps-button"].firstMatch.tap(); settle(); shot("12-steps"); app.buttons["Done"].firstMatch.tap() }; back() }
+        if tapText("This week in agent research") { settle(); shot("13-markdown-artifacts"); back() }
+        app.buttons["ask-bar"].tap(); settle(); shot("16-ask"); app.buttons["Close"].firstMatch.tap()
+        tab("Agents"); settle(); shot("30-agents")
+        if tapText("Caddy") { settle(); shot("31-agent"); app.swipeUp(); shot("32-agent-runtime"); back() }
+        tab("Now"); app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Studio connection' ")).firstMatch.tap(); settle(); shot("40-studio")
+        if tapText("Settings") { settle(); shot("41-settings"); back() }
+        if tapText("Skills") { settle(); shot("42-skills"); back() }
     }
-
-    // MARK: Helpers
 
     private func settle(_ seconds: TimeInterval = 0.8) {
         Thread.sleep(forTimeInterval: seconds)
@@ -165,7 +54,13 @@ final class ScreenTourTests: XCTestCase {
     }
 
     private func tab(_ label: String) {
-        app.tabBars.buttons[label].tap()
+        let button = app.tabBars.buttons[label]
+        if !button.exists {
+            let collapsed = app.tabBars.buttons.matching(NSPredicate(format: "value == 'Collapsed'")).firstMatch
+            if collapsed.exists { collapsed.tap() }
+        }
+        for _ in 0..<3 where !button.exists { app.swipeDown() }
+        XCTAssertTrue(button.waitForExistence(timeout:5)); button.tap()
     }
 
     private func segment(_ label: String) {
@@ -176,7 +71,8 @@ final class ScreenTourTests: XCTestCase {
 
     @discardableResult
     private func tapText(_ label: String) -> Bool {
-        let element = app.staticTexts[label].firstMatch
+        let button = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@",label)).firstMatch
+        let element = button.exists ? button : app.staticTexts[label].firstMatch
         var attempts = 0
         while !(element.exists && element.isHittable) && attempts < 4 {
             if attempts == 0 && element.waitForExistence(timeout: 2) && element.isHittable { break }

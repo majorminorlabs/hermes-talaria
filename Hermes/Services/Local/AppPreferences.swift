@@ -3,8 +3,14 @@ import SwiftUI
 /// Local-only UI preferences. Nothing here is canonical Hermes state.
 @Observable
 final class AppPreferences {
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
 
+    var reviewVoiceBeforeSending: Bool {
+        get { defaults.bool(forKey: "vnext.reviewVoiceBeforeSending") }
+        set { defaults.set(newValue, forKey: "vnext.reviewVoiceBeforeSending") }
+    }
+    var recentModels: [ModelRef] { didSet { defaults.set(try? JSONEncoder().encode(recentModels), forKey: "vnext.recentModels") } }
+    func rememberModel(_ model: ModelRef?) { guard let model else { return }; recentModels = [model] + recentModels.filter { $0.id != model.id || $0.provider != model.provider }.prefix(4) }
     var appearance: AppearancePreference { didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) } }
     var hapticsEnabled: Bool { didSet { defaults.set(hapticsEnabled, forKey: Keys.haptics) } }
     var defaultProfileID: String? { didSet { defaults.set(defaultProfileID, forKey: Keys.defaultProfile) } }
@@ -21,6 +27,7 @@ final class AppPreferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        recentModels = defaults.data(forKey: "vnext.recentModels").flatMap { try? JSONDecoder().decode([ModelRef].self, from: $0) } ?? []
         appearance = AppearancePreference(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .system
         hapticsEnabled = defaults.object(forKey: Keys.haptics) as? Bool ?? true
         defaultProfileID = defaults.string(forKey: Keys.defaultProfile)

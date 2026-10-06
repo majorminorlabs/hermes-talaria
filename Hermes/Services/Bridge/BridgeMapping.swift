@@ -92,8 +92,8 @@ nonisolated enum BridgeMapping {
                             createdAt: created, lastActivity: date(j["last_activity"]) ?? date(j["last_active"]) ?? created,
                             preview: j["snippet"].string ?? j["preview"].string ?? "", project: nil,
                             model: j["read_only"].bool == true ? configuredModel(j) : model(j), activeRunID: nil,
-                            isPinned: false, messageCount: j["message_count"].int ?? 0, readOnly: j["read_only"].bool,
-                            isBotChat: botID != nil || j["is_bot_chat"].bool == true,
+                            isPinned: false, messageCount: j["message_count"].int ?? 0, readOnly: j["read_only"].bool, isArchived: j["archived"].bool,
+                            isBotChat: j["is_bot_chat"].bool ?? j["canonical"].bool ?? (botID != nil),
                             botID: botID, botProfileID: j["bot_profile"].string)
     }
     static func run(_ j: BridgeJSON, hostID: String) -> Run {
@@ -105,7 +105,8 @@ nonisolated enum BridgeMapping {
         case "complete": .completed
         case "failed": .failed
         case "cancelled": .cancelled
-        default: .disconnected
+        case "unknown": .unknown
+        default: .unknown
         }
         let seq = sequence(j["snapshot_cursor"].string)
         let text = j["assistant_text"].string ?? ""
@@ -134,7 +135,8 @@ nonisolated enum BridgeMapping {
             expiresAt: expiry,
             availability: fresh ? .actionable : .unavailableRemotely(clarify ? "This question is no longer current. Check Hermes on your Mac." : "Hermes can't safely target this approval from the phone. Resolve it on your Mac, or stop the run."),
             allowsSessionApproval: false, clarificationQuestion: clarify ? (d["question"].string ?? "Hermes needs an answer") : nil,
-            clarificationChoices: clarify ? d["choices"].array.compactMap(\.string) : nil)
+            clarificationChoices: clarify ? d["choices"].array.compactMap(\.string) : nil,
+            recommendedChoice: d["recommended"].string ?? d["default"].string, onTimeout: d["on_timeout"].string)
     }
     static func taskStatus(_ raw: String) -> TaskStatus? {
         switch raw { case "running": .inProgress; case "done", "complete": .completed; default: TaskStatus(rawValue: raw) }
@@ -144,7 +146,7 @@ nonisolated enum BridgeMapping {
         let j = json["task"].object.isEmpty ? json : json["task"]
         let raw = j["raw_state"].string ?? j["state"].string ?? "triage"
         let targets = json["supported_targets"].array.compactMap { $0.string.flatMap(taskStatus) }
-        return HermesTask(id: j["id"].string ?? "", title: j["title"].string ?? "Task", summary: j["body"].string ?? "",
+        return HermesTask(id: j["id"].string ?? "", title: j["title"].string ?? "Task", summary: j["latest_summary"].string ?? j["result"].string ?? j["body"].string ?? "",
             status: taskStatus(raw) ?? .triage, assigneeProfileID: j["assignee"].string,
             priority: TaskPriority(rawValue: j["priority"].int ?? 1) ?? .normal, hostID: hostID, project: nil,
             createdAt: date(j["created_at"]) ?? .distantPast, updatedAt: date(j["updated_at"]) ?? .distantPast,
@@ -166,6 +168,7 @@ nonisolated enum BridgeMapping {
     }
     static func toolKind(_ name: String) -> ToolKind {
         let n = name.lowercased()
+        if n.contains("delegate") { return .delegate }
         if n.contains("terminal") { return .terminal }
         if n.contains("file") { return .files }
         if n.contains("browser") { return .browser }

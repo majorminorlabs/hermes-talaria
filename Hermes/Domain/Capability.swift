@@ -14,6 +14,7 @@ nonisolated enum HermesCapability: String, Codable, Sendable, CaseIterable, Iden
     case botMode
     /// Writable canonical chats for named Desktop bots.
     case botCreate, botEdit, botHide, botDuplicate, botInventory
+    case botThreads, captures
     case botChat
     case profiles
     case cron
@@ -34,6 +35,8 @@ nonisolated enum HermesCapability: String, Codable, Sendable, CaseIterable, Iden
 
     var label: String {
         switch self {
+        case .botThreads: "Agent threads"
+        case .captures: "Captures"
         case .sessions: "Conversations"
         case .runs: "Runs"
         case .runReplay: "Event replay"
@@ -65,6 +68,8 @@ nonisolated enum HermesCapability: String, Codable, Sendable, CaseIterable, Iden
 
     var symbol: String {
         switch self {
+        case .botThreads: "bubble.left.and.text.bubble.right"
+        case .captures: "tray.and.arrow.down"
         case .sessions: "bubble.left.and.bubble.right"
         case .runs: "play.circle"
         case .runReplay: "arrow.counterclockwise"

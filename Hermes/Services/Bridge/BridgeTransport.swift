@@ -386,7 +386,11 @@ actor BridgeTransport {
             case 401: throw HermesError.unauthorized
             case 404: throw HermesError.notFound
             case 409:
-                if code == "bot_model_confirmation_required" { throw HermesError.botModelConfirmation }
+                if code == "bot_model_confirmation_required" {
+                    let explanation = (try? JSONDecoder().decode(BridgeJSON.self, from: data))?["error"]["details"]["confirm_message"].string
+                    if let explanation, !explanation.isEmpty { throw HermesError.botModelConfirmationText(explanation) }
+                    throw HermesError.botModelConfirmation
+                }
                 if code == "command_uncertain", let mutationKey {
                     throw HermesError.commandUncertain(mutationKey)
                 }

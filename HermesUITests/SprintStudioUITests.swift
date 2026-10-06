@@ -8,13 +8,13 @@ final class SprintStudioUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication(); app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Bots"].waitForExistence(timeout:20)); app.tabBars.buttons["Bots"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout:20)); app.tabBars.buttons["Agents"].tap()
         return app
     }
     private func row(_ name:String,_ app:XCUIApplication)->XCUIElement { app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",name)).firstMatch }
     private func input(_ app:XCUIApplication)->XCUIElement { app.textViews.firstMatch.exists ? app.textViews.firstMatch : app.textFields.firstMatch }
     private func chat(_ app:XCUIApplication) {
-        let chat=app.collectionViews.buttons["Chat"].firstMatch
+        let chat=app.buttons["agent-ask"].firstMatch
         for _ in 0..<20 where !chat.isHittable { app.swipeDown() }
         XCTAssertTrue(chat.waitForExistence(timeout:20)); chat.tap()
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout:20) || app.textViews.firstMatch.exists)
@@ -30,7 +30,7 @@ final class SprintStudioUITests: XCTestCase {
         send("Read the attached research-terminal skill and use only its helper read-only search for Hermes, limit 5, normally with the existing environment. Do not create jobs, change files, export environment variables, inspect credentials, or contact anyone. On successful retrieval begin \(marker) and give count, first source title, and its record ID. On failure state the error.",marker,app)
         let result=app.staticTexts.matching(NSPredicate(format:"label BEGINSWITH %@",marker)).firstMatch
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Memory-Efficient Pipeline'")).firstMatch.waitForExistence(timeout:20))
-        app.terminate();app.launch();app.tabBars.buttons["Bots"].tap();row("Research Orchestrator",app).tap();chat(app)
+        app.terminate();app.launch();app.tabBars.buttons["Agents"].tap();row("Research Orchestrator",app).tap();chat(app)
         XCTAssertTrue(result.waitForExistence(timeout:30))
         for _ in 0..<8 where !result.isHittable {
             app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.65)).press(forDuration:0.05,thenDragTo:app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.25)))
@@ -45,7 +45,7 @@ final class SprintStudioUITests: XCTestCase {
         _ = row(probeName,app).waitForExistence(timeout:10)
         for _ in 0..<5 where !row(probeName,app).exists { app.swipeUp() }
         if !row(probeName,app).exists {
-        XCTAssertTrue(app.buttons["Create Bot"].waitForExistence(timeout:30));app.buttons["Create Bot"].tap()
+        XCTAssertTrue(app.buttons["Create Agent"].waitForExistence(timeout:30));app.buttons["Create Agent"].tap()
         let name=app.textFields["bot-name"]
         if !name.waitForExistence(timeout:60), let retry = app.buttons.matching(identifier:"Retry").allElementsBoundByIndex.first(where: { $0.isHittable }) { evidence("Transient inventory failure before explicit Retry",app);retry.tap() }
         XCTAssertTrue(name.waitForExistence(timeout:60));name.tap();name.typeText(probeName);XCTAssertEqual(name.value as? String,probeName)
@@ -70,7 +70,7 @@ final class SprintStudioUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Edited on iPhone'")).firstMatch.waitForExistence(timeout:20));evidence("Edited native phone bot",app)
         XCUIDevice.shared.press(.home);Thread.sleep(forTimeInterval:3);app.activate()
         chat(app);send("Reply exactly SPRINT_PHONE_NEW_BOT_CHAT_OK. Do not run tools.","SPRINT_PHONE_NEW_BOT_CHAT_OK",app)
-        app.terminate();app.launch();app.tabBars.buttons["Bots"].tap();XCTAssertTrue(row(probeName,app).waitForExistence(timeout:30));row(probeName,app).tap();chat(app)
+        app.terminate();app.launch();app.tabBars.buttons["Agents"].tap();XCTAssertTrue(row(probeName,app).waitForExistence(timeout:30));row(probeName,app).tap();chat(app)
         XCTAssertTrue(app.staticTexts["SPRINT_PHONE_NEW_BOT_CHAT_OK"].waitForExistence(timeout:30));evidence("Native bot canonical history after relaunch",app)
     }
     func testCameraCapturePreviewAndSend() throws {
@@ -146,8 +146,8 @@ final class SprintStudioUITests: XCTestCase {
         let hide=app.buttons["Hide"];XCTAssertTrue(app.collectionViews.firstMatch.waitForExistence(timeout:20))
         for _ in 0..<40 where !(hide.exists && hide.isHittable) { app.swipeUp() }  // Management section is last
         XCTAssertTrue(hide.waitForExistence(timeout:20));hide.tap()
-        XCTAssertTrue(app.buttons["Hide Bot"].waitForExistence(timeout:15));evidence("Physical hide confirmation retains history",app);app.buttons["Hide Bot"].tap()
-        XCTAssertTrue(app.navigationBars["Bots"].waitForExistence(timeout:120))
+        XCTAssertTrue(app.buttons["Hide Agent"].waitForExistence(timeout:15));evidence("Physical hide confirmation retains history",app);app.buttons["Hide Agent"].tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout:120))
         let hidden=expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:row(probeName,app))
         XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:120),.completed);evidence("Phone bot hidden",app)
     }
@@ -179,7 +179,7 @@ final class SprintStudioUITests: XCTestCase {
         send("Reply with \(marker) on its own line, then exactly this Markdown table, and nothing else. No tools.\n\n| Check | Result |\n| --- | --- |\n| Talaria table acceptance | Passed |\n| Editable text | Preserved |",marker,app)
         XCTAssertTrue(app.descendants(matching:.any)["markdown-table-grid"].firstMatch.waitForExistence(timeout:15));evidence("Talaria physical normal table",app)
         app.terminate();app.launchArguments=["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityL"];app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Bots"].waitForExistence(timeout:20));app.tabBars.buttons["Bots"].tap();row(probeName,app).tap();chat(app)
+        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout:20));app.tabBars.buttons["Agents"].tap();row(probeName,app).tap();chat(app)
         let table=app.descendants(matching:.any)["markdown-table-accessible"].firstMatch
         XCTAssertTrue(table.waitForExistence(timeout:15))
         for _ in 0..<10 where !table.isHittable { app.swipeDown() }

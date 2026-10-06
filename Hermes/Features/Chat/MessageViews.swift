@@ -9,6 +9,7 @@ struct MessageView: View {
     var onShowDetails: (Run) -> Void
 
     @Environment(ActivityStore.self) private var activity
+    @Environment(AppEnvironment.self) private var environment
 
     var body: some View {
         switch message.role {
@@ -32,18 +33,22 @@ struct MessageView: View {
                 partView(part, isLive: isLive)
             }
             if isLive, let run {
-                LiveRunBlock(run: run, onSteer: onSteer)
+                RunCard(run: run, onSteer: onSteer)
             }
-            if !isLive && message.status != .streaming && isLatestAssistant {
-                MessageFooter(message: message, run: run, onShowDetails: onShowDetails)
+            if !isLive && message.status != .streaming,
+               let run, environment.conversations.transcripts[message.conversationID]?.last(where: { $0.role == .assistant && $0.runID == run.id })?.id == message.id {
+                ResultFooter(run: run)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.plainText }
             ShareLink(item: message.plainText)
+            Button("Capture This Result") { environment.router.captureSeed = CaptureSeed(text: message.plainText) }
+            Button("New thread with this agent") { environment.router.askSeed = AskSeed(agentID: environment.conversations.conversations[message.conversationID]?.profileID) }
+            Button("Ask another agent…") { environment.router.askSeed = AskSeed(text: message.plainText) }
             if let run, !isLive {
-                Button("Run Details", systemImage: "info.circle") { onShowDetails(run) }
+                Button("Steps", systemImage: "info.circle") { onShowDetails(run) }
             }
         }
     }
@@ -131,11 +136,12 @@ struct MessageErrorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             FailureCallout(explanation: explanation)
+            if runID.flatMap({ activity.run($0) })?.canRetry == true { Text("Earlier effects may already have happened. Check them before retrying.").font(.footnote).foregroundStyle(Theme.secondaryText) }
             if error.isRetryable, let runID, activity.run(runID)?.canRetry == true, connection.supports(.runs) {
                 Button {
                     toasts.perform(success: "Retrying") { try await activity.retry(runID) }
                 } label: {
-                    Label("Retry Run", systemImage: "arrow.clockwise")
+                    Label("Retry", systemImage: "arrow.clockwise")
                 }
                 .font(.subheadline.weight(.medium))
                 .buttonStyle(.bordered)

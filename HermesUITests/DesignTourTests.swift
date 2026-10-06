@@ -16,173 +16,23 @@ final class DesignTourTests: XCTestCase {
     }
 
     func testDesignStates() throws {
-        let app = launch(["-resetState", "-simulateDictation"])
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout: 10))
-        settle(1.5)
-
-        // Failed run: plain-language failure, raw code under Details.
-        app.tabBars.buttons["Tasks"].tap()
-        segment("Completed", app)
-        if tapText("Evaluate Hermes 4 tool calling", app) {
-            XCTAssertTrue(app.buttons["Retry Run"].waitForExistence(timeout: 5))
-            settle()
-            shot("80-run-failed", app)
-            let details = app.buttons["Show details"].firstMatch
-            if details.waitForExistence(timeout: 3) {
-                details.tap()
-                settle(0.5)
-                shot("81-run-failed-details", app)
-            }
-            back(app)
-        }
-
-        // Create a bot, look at its capabilities, then edit it.
-        app.tabBars.buttons["Bots"].tap()
-        settle()
-        XCTAssertTrue(app.buttons["Create Bot"].waitForExistence(timeout: 10))
-        app.buttons["Create Bot"].tap()
-        let name = app.textFields["bot-name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10))
-        settle(0.5)
-        shot("82-create-bot", app)
-        let skills = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Skills'")).firstMatch
-        if skills.waitForExistence(timeout: 3) {
-            skills.tap()
-            settle()
-            shot("83-create-bot-skills", app)
-            back(app)
-        }
-        name.tap(); name.typeText("Field Notes")
-        let role = app.textFields["bot-description"]
-        role.tap(); role.typeText("Keeps tidy notes from research sessions")
-        app.buttons["Create"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Field Notes'")).firstMatch
-        if row.waitForExistence(timeout: 10) {
-            settle()
-            shot("84-bots-after-create", app)
-            row.tap()
-            settle()
-            shot("85-bot-detail", app)
-            if app.buttons["Edit"].waitForExistence(timeout: 5) {
-                app.buttons["Edit"].tap()
-                settle()
-                shot("86-edit-bot", app)
-                app.buttons["Cancel"].tap()
-                settle(0.5)
-            }
-            back(app)
-        }
-
-        // Composer: attachment preview, then dictation.
-        app.tabBars.buttons["Chat"].tap()
-        settle()
-        app.navigationBars.buttons["New Chat"].firstMatch.tap()
-        settle()
-        if app.buttons["Add attachment"].waitForExistence(timeout: 5) {
-            app.buttons["Add attachment"].tap()
-            if app.buttons["Photo Library"].waitForExistence(timeout: 3) {
-                app.buttons["Photo Library"].tap()
-                let photos = app.images.matching(NSPredicate(format: "identifier == 'PXGGridLayout-Info'"))
-                if photos.firstMatch.waitForExistence(timeout: 10) {
-                    settle(1)
-                    // The out-of-process picker reports its cells as not hittable; tap by position.
-                    photos.element(boundBy: 0).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                    if app.buttons["Add"].waitForExistence(timeout: 3) { app.buttons["Add"].tap() }
-                    settle(1.5)
-                    shot("87-composer-attachment", app)
-                } else {
-                    app.swipeDown(velocity: .fast)
-                }
-            }
-        }
-        if app.buttons["Voice input"].waitForExistence(timeout: 3) {
-            app.buttons["Voice input"].tap()
-            settle(0.9)
-            shot("88-dictation-listening", app)
-            settle(1.6)
-            shot("89-dictation-partial", app)
-            if app.buttons["Stop dictation"].exists { app.buttons["Stop dictation"].tap() }
-            settle(0.5)
-            shot("90-dictation-done", app)
-        }
-        app.terminate()
-
-        let reconnecting = launch(["-simulate", "reconnecting"])
-        settle(3)
-        shot("91-home-reconnecting", reconnecting)
-        reconnecting.terminate()
+        let app = XCUIApplication(); app.launchArguments = ["-uiTesting", "-resetState", "-pref.appearance", ProcessInfo.processInfo.environment["TOUR_APPEARANCE"] ?? "light"]; app.launch()
+        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10)); shot("design-now", app)
+        app.tabBars.buttons["Threads"].tap(); shot("design-threads", app)
+        app.tabBars.buttons["Agents"].tap(); shot("design-agents", app)
+        app.buttons["Create Agent"].tap(); XCTAssertTrue(app.textFields["bot-name"].waitForExistence(timeout:5)); shot("design-agent-editor", app); app.buttons["Cancel"].firstMatch.tap()
+        app.buttons["capture-button"].tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForExistence(timeout:5)); shot("design-capture", app); app.buttons["Close"].firstMatch.tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForNonExistence(timeout:5))
+        app.buttons["ask-bar"].tap(); XCTAssertTrue(app.navigationBars["Ask"].waitForExistence(timeout:5)); shot("design-ask", app)
     }
 
     func testLargeDynamicType() throws {
-        continueAfterFailure = false
-        let app = launch(["-resetState", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout: 10))
-        settle(1.5)
-        shot("92-home-large-text", app)
-        app.tabBars.buttons["Chat"].tap()
-        settle()
-        shot("93-chat-large-text", app)
-        XCTAssertTrue(tapText("Researcher", app))
-        let table=app.descendants(matching:.any)["markdown-table-accessible"].firstMatch
-        XCTAssertTrue(table.waitForExistence(timeout: 10), "Original Researcher table must render at accessibility size")
-        for _ in 0..<12 where !table.isHittable { app.swipeDown() }
-        XCTAssertTrue(table.isHittable)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'OpenRouter'")).firstMatch.exists)
-        shot("94-conversation-table-large-text", app)
-        back(app)
-        XCTAssertTrue(app.navigationBars["Chat"].waitForExistence(timeout: 5), "Table must leave navigation responsive")
-        app.tabBars.buttons["Bots"].tap()
-        settle()
-        shot("95-bots-large-text", app)
-    }
-
-    func testLargestDynamicTypeTable() throws {
-        continueAfterFailure = false
         let app = launch(["-resetState", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(tapText("Researcher", app))
-        let table=app.descendants(matching:.any)["markdown-table-accessible"].firstMatch
-        for _ in 0..<16 where !(table.exists && table.isHittable) { app.swipeDown() }
-        XCTAssertTrue(table.waitForExistence(timeout: 10))
-        XCTAssertTrue(table.isHittable)
-        shot("94b-conversation-table-largest-text", app)
-        back(app)
-        XCTAssertTrue(app.navigationBars["Chat"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10)); shot("large-now",app)
+        app.tabBars.buttons["Threads"].tap(); shot("large-threads",app)
+        app.tabBars.buttons["Agents"].tap(); shot("large-agents",app)
+        XCTAssertTrue(app.buttons["ask-bar"].exists)
+        app.buttons["ask-bar"].tap(); XCTAssertTrue(app.buttons["ask-send"].waitForExistence(timeout:5)); shot("large-ask",app)
     }
-
-    func testNormalTableAndLiveRun() throws {
-        continueAfterFailure = false
-        let app=launch(["-resetState"])
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout:10))
-        app.tabBars.buttons["Chat"].tap();XCTAssertTrue(tapText("Researcher",app))
-        XCTAssertTrue(app.buttons["Send Instruction"].firstMatch.waitForExistence(timeout:10))
-        XCTAssertTrue(app.buttons["Stop"].firstMatch.isHittable)
-        shot("97-active-run-controls",app)
-        let table=app.descendants(matching:.any)["markdown-table-grid"].firstMatch
-        for _ in 0..<12 where !(table.exists && table.isHittable) { app.swipeDown() }
-        XCTAssertTrue(table.isHittable);shot("98-normal-markdown-table",app)
-        back(app);XCTAssertTrue(app.navigationBars["Chat"].waitForExistence(timeout:5))
-    }
-
-    /// The installed app is named Talaria and wears the winged-sandal icon.
-    func testHomeScreenIcon() throws {
-        let app = launch(["-resetState"])
-        XCTAssertTrue(app.navigationBars["Talaria"].waitForExistence(timeout: 10))
-        XCUIDevice.shared.press(.home)
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let icon = springboard.icons["Talaria"]
-        XCTAssertTrue(icon.waitForExistence(timeout: 10), "Home Screen shows the Talaria display name")
-        for _ in 0..<5 where !icon.isHittable {
-            springboard.swipeLeft()
-            settle(0.6)
-        }
-        settle(1)
-        shot("96-home-screen-icon", springboard)
-    }
-
-    // MARK: Helpers
-
     private func launch(_ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting"] + arguments

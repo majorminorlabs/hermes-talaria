@@ -24,6 +24,7 @@ struct BotEditorView: View {
     @State private var loadError: String?
     @State private var loaded = false
     @State private var confirmingModel = false
+    @State private var modelWarning = "Hermes warns that this model may increase usage or cost. Apply the selected model?"
     @State private var confirmModel = false
     var body: some View {
         NavigationStack {
@@ -113,7 +114,7 @@ struct BotEditorView: View {
                 }
             }
             .disabled(saving)
-            .navigationTitle(profile == nil ? "New Bot" : "Edit Bot")
+            .navigationTitle(profile == nil ? "New Agent" : "Edit Agent")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
@@ -126,7 +127,7 @@ struct BotEditorView: View {
                     }
                 }
             }
-            .confirmationDialog("Hermes warns that this model may increase usage or cost. Apply the selected model?", isPresented:$confirmingModel,titleVisibility:.visible) {
+            .confirmationDialog(modelWarning, isPresented:$confirmingModel,titleVisibility:.visible) {
                 Button("Apply Model") { confirmModel = true; save() }
                 Button("Cancel",role:.cancel) {}
             }
@@ -201,8 +202,9 @@ struct BotEditorView: View {
             do {
                 if let profile { try await profiles.update(profile.id, changes: submitted) }
                 else { _ = try await profiles.create(BotDraft(changes: submitted)) }
-                toasts.show(profile == nil ? "Bot created" : "Bot updated"); dismiss()
-            } catch HermesError.botModelConfirmation { confirmingModel = true }
+                toasts.show(profile == nil ? "Agent created" : "Agent updated"); dismiss()
+            } catch HermesError.botModelConfirmationText(let message) { modelWarning = message; confirmingModel = true }
+            catch HermesError.botModelConfirmation { confirmingModel = true }
             catch { await profiles.refresh(); toasts.show(error: error) }
         }
     }

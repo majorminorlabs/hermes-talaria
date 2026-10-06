@@ -14,11 +14,13 @@ struct ConversationView: View {
     @FocusState private var composerFocused: Bool
     @State private var steeringRun: Run?
     @State private var detailsRun: Run?
+    @State private var stepsRun: Run?
     @State private var isNearBottom = true
     @State private var renaming = false
     @State private var renameText = ""
     @State private var confirmingDelete = false
     @State private var artifacts: [FileAttachment] = []
+    @State private var showingFiles = false
     @State private var downloadedArtifact: URL?
     @Environment(AppEnvironment.self) private var environment
 
@@ -31,23 +33,6 @@ struct ConversationView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
                     content
-                    if !artifacts.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionHeader("Artifacts")
-                            ForEach(artifacts) { artifact in
-                                Button {
-                                    toasts.perform {
-                                        guard let service = environment.client.conversations as? any ArtifactService else { return }
-                                        downloadedArtifact = try await service.downloadArtifact(id:artifact.id)
-                                    }
-                                } label: {
-                                    FileAttachmentView(file: artifact)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityHint("Downloads and previews the file")
-                            }
-                        }
-                    }
                     Color.clear.frame(height: 1).id(bottomID)
                 }
                 .padding(.horizontal, 16)
@@ -69,11 +54,15 @@ struct ConversationView: View {
                 if focused { withAnimation { proxy.scrollTo(bottomID, anchor: .bottom) } }
             }
         }
+        .pinnedTopBar {
+            if let run = model.activeRun ?? environment.activity.runs.values.first(where: { $0.conversationID == model.conversationID && $0.state == .unknown }) { WorkStatusBar(run: run, steer: { composerFocused = true }, steps: { stepsRun = run }) }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let pending = environment.needsYou.all.first(where: { $0.workItemID == model.conversationID && ($0.kind == .question || $0.kind == .decision || $0.kind == .approval) }) { NeedsYouCard(item: pending) }
             if model.conversation?.readOnly == true {
                 HStack(spacing: 6) {
                     Image(systemName: "lock").accessibilityHidden(true)
-                    Text(model.conversation?.isBotChat == true ? "Studio Bot Chat · Read only" : "Read-only conversation")
+                    Text(model.conversation?.isBotChat == true ? "Studio canonical thread · Read only" : "Read-only thread")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -88,13 +77,17 @@ struct ConversationView: View {
         .connectionBanner(updatedAt: conversations.updatedAt)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
-        .task { await model.load(); await loadArtifacts() }
+        .task { if let id = model.conversationID { environment.work.markSeen(id) }; await model.load(); await loadArtifacts(); if let id = environment.router.stepsRunID { stepsRun = environment.activity.run(id); environment.router.stepsRunID = nil } }
         .refreshable { await model.load() }
-        .onChange(of: model.activeRun?.state) { Task { await loadArtifacts() } }
+        .onChange(of: model.activeRun?.state) { if let id = model.conversationID { environment.work.markSeen(id) }; Task { await loadArtifacts() } }
         .quickLookPreview($downloadedArtifact)
+        .sheet(isPresented: $showingFiles) {
+            NavigationStack { List { ForEach(artifacts.reversed()) { file in ArtifactRow(file: file) { download(file) } }; Text("Only files Hermes registered for the phone appear here.").font(.footnote).foregroundStyle(Theme.secondaryText) }.navigationTitle("Files").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingFiles = false } } } }
+        }
         .sheet(item: $steeringRun) { run in SteerSheet(run: run) }
+        .sheet(item: $stepsRun) { StepsSheet(runID: $0.id) }
         .sheet(item: $detailsRun) { run in RunSummarySheet(run: run) }
-        .alert("Rename Conversation", isPresented: $renaming) {
+        .alert("Rename Thread", isPresented: $renaming) {
             TextField("Title", text: $renameText)
             Button("Save") {
                 guard let id = model.conversationID else { return }
@@ -102,7 +95,7 @@ struct ConversationView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog("Delete this conversation?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete this thread?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 guard let id = model.conversationID else { return }
                 toasts.perform {
@@ -115,6 +108,9 @@ struct ConversationView: View {
         }
     }
 
+    private func download(_ artifact: FileAttachment) {
+        toasts.perform { guard let service = environment.client.conversations as? any ArtifactService else { return }; downloadedArtifact = try await service.downloadArtifact(id: artifact.id) }
+    }
     private func loadArtifacts() async {
         guard connection.supports(.artifacts), let id = model.conversationID,
               let service = environment.client.conversations as? any ArtifactService else { return }
@@ -143,10 +139,7 @@ struct ConversationView: View {
                 ErrorContentView(error: error) { await model.load() }
                     .padding(.top, 40)
             default:
-                NewConversationIntro(profile: profiles.identity(model.configuration.profileID)) { suggestion in
-                    model.draft = suggestion
-                    composerFocused = true
-                }
+                Text("Ask a follow-up…").foregroundStyle(.secondary)
             }
         } else {
             let latestAssistantID = model.messages.last(where: { $0.role == .assistant && !$0.plainText.isEmpty })?.id
@@ -155,13 +148,20 @@ struct ConversationView: View {
                 case .message(let message):
                     MessageView(message: message, isLatestAssistant: message.id == latestAssistantID,
                                 onSteer: { steeringRun = model.activeRun },
-                                onShowDetails: { detailsRun = $0 })
+                                onShowDetails: { stepsRun = $0 })
                         .id(message.id)
+                    if message.role == .assistant && !message.plainText.isEmpty {
+                        let lastForTurn = model.messages.last(where: { $0.role == .assistant && $0.runID == message.runID && !$0.plainText.isEmpty })?.id == message.id
+                        let latest = model.messages.last(where: { $0.role == .assistant && !$0.plainText.isEmpty })?.id == message.id
+                        ForEach(artifacts.filter { ($0.runID != nil && $0.runID == message.runID && lastForTurn) || ($0.runID == nil && latest) }) { file in ArtifactRow(file: file) { download(file) } }
+                    }
                 case .tools(let id, let calls):
                     ToolActivityView(calls: calls).id(id)
                 }
             }
         }
+        if let run = environment.activity.runs.values.filter({ $0.conversationID == model.conversationID && ($0.state.isTerminal || $0.state == .unknown) }).max(by: { $0.startedAt < $1.startedAt }),
+           !model.messages.contains(where: { $0.role == .assistant && $0.runID == run.id }) { ResultFooter(run: run) }
     }
 
     @ToolbarContentBuilder
@@ -180,21 +180,22 @@ struct ConversationView: View {
                         toasts.perform { try await conversations.setPinned(!conversation.isPinned, conversation.id) }
                     }
                     if let run = model.activeRun {
-                        NavigationLink(value: Route.run(run.id)) {
-                            Label("Active Run", systemImage: "play.circle")
-                        }
+                        Button("Steps") { stepsRun = run }
                     }
                     if !conversation.usesDefaultProfile {
                         NavigationLink(value: Route.profile(conversation.profileID)) {
-                            Label("Bot Profile", systemImage: "person.crop.circle")
+                            Label("View Agent", systemImage: "person.crop.circle")
                         }
                     }
+                    if !artifacts.isEmpty { Button("Files (\(artifacts.count))") { showingFiles = true } }
+                    Button("Mark Unread") { environment.seen.mark(conversation.id, at: .distantPast, host: connection.activeHostID) }
+                    if conversation.isBotChat != true { Button("Archive") { toasts.perform { try await conversations.setArchived(true, conversation.id); dismiss() } } }
                     Divider()
                     if conversation.isBotChat != true { Button("Delete", systemImage: "trash", role: .destructive) { confirmingDelete = true } }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
-                .accessibilityLabel("Conversation actions")
+                .accessibilityLabel("Thread actions")
             }
         }
     }
@@ -209,7 +210,7 @@ private struct ConversationTitle: View {
 
     var body: some View {
         let profile = profiles.identity(model.conversation?.profileID ?? model.configuration.profileID)
-        let title = model.conversation?.title ?? "New Chat"
+        let title = model.conversation?.title ?? "New Thread"
         HStack(spacing: 8) {
             ProfileAvatar(profile: profile, size: 24)
             VStack(alignment: .leading, spacing: 0) {
@@ -242,8 +243,8 @@ private struct ConversationTitle: View {
     private func subtitleText(_ profile: Profile?, title: String) -> String? {
         var parts: [String] = []
         if model.conversation?.isBotChat == true {
-            parts.append("Bot chat")
-        } else if let profile, !profile.isDefault || title == "New Chat" {
+            parts.append("Shared thread")
+        } else if let profile, !profile.isDefault || title == "New Thread" {
             parts.append(profile.name)
         }
         if let project = model.configuration.project { parts.append(project.name) }
@@ -254,50 +255,3 @@ private struct ConversationTitle: View {
 }
 
 /// Empty state for a fresh conversation.
-private struct NewConversationIntro: View {
-    var profile: Profile?
-    var onSuggestion: (String) -> Void
-
-    var body: some View {
-        VStack(spacing: 18) {
-            ProfileAvatar(profile: profile, size: 52)
-            VStack(spacing: 4) {
-                Text(profile?.name ?? "Hermes").font(.title3.weight(.semibold))
-                Text((profile?.summary).flatMap { $0.isEmpty ? nil : $0 } ?? "Hermes runs on your Mac Studio.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            VStack(spacing: 8) {
-                ForEach(suggestions, id: \.self) { suggestion in
-                    Button {
-                        onSuggestion(suggestion)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Text(suggestion)
-                                .font(.subheadline)
-                                .multilineTextAlignment(.leading)
-                            Spacer(minLength: 0)
-                            Image(systemName: "arrow.up.left")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .panel(padding: 12, cornerRadius: 12)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 48)
-    }
-
-    private var suggestions: [String] {
-        switch profile?.id {
-        case MockID.caddy: ["Run the test suite and fix anything that fails", "Clean up the build cache", "Summarize what changed this week"]
-        case MockID.researcher: ["Compare the latest open-weight coding models", "Find papers on agent memory from this month"]
-        case MockID.dex: ["What's on my calendar tomorrow?", "Draft a reply to the landlord"]
-        default: ["What's running on the Studio right now?", "Summarize yesterday's routine results", "Research speculative decoding on Apple silicon"]
-        }
-    }
-}

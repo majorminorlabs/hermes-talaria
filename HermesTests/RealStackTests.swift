@@ -23,7 +23,7 @@ struct RealStackTests {
         await client.connect(to:host)
         #expect(try await client.status(hostID:host.id).connection == .connected)
         _ = try await client.listConversations()
-        #expect(try await client.listProfiles().contains { $0.id == "default" })
+        #expect(try await client.listProfiles().contains { $0.isDefault })
         #expect(try await client.listRoutines().contains { $0.name == "Local scheduled work" })
         #expect(try await client.listTasks().contains { $0.title == "Local Kanban fixture" })
         #expect(try await client.usage(period:.day).sessionCount != nil)
@@ -91,12 +91,12 @@ struct RealStackTests {
         let restartRun = try await relaunched.send(OutgoingMessage(text:"exercise-safe-tool"),conversationID:rc.id,configuration:config)
         try await wait { collector.runs[restartRun.id]?.toolEvents.isEmpty == false }
         try await restart("hermes")
-        try await wait { collector.runs[restartRun.id]?.state == .disconnected }
+        try await wait { collector.runs[restartRun.id]?.state == .unknown }
         try await wait {
             guard let s = try? await relaunched.status(hostID:host.id) else { return false }
             return s.connection == .connected
         }
-        #expect(try await relaunched.run(id:restartRun.id).state == .disconnected)
+        #expect(try await relaunched.run(id:restartRun.id).state == .unknown)
         try await restart("bridge")
         try await wait {
             guard let s = try? await relaunched.status(hostID:host.id) else { return false }
@@ -110,7 +110,26 @@ struct RealStackTests {
         let (evidenceData,_)=try await URLSession.shared.data(for:evidenceReq)
         let evidence=try JSONDecoder().decode(BridgeJSON.self,from:evidenceData)
         #expect(evidence["steering_consumed"].bool == true)
-        #expect(evidence["commit"].string?.hasPrefix("2a4c9afd7bd") == true)
+        #expect(evidence["commit"].string == fixture["commit"].string)
+        // New independent Agent threads and verbatim captures use the production client.
+        let phaseOneStatus = try await relaunched.status(hostID: host.id)
+        #expect(phaseOneStatus.capabilities.contains(.botThreads))
+        #expect(phaseOneStatus.capabilities.contains(.captures))
+        if phaseOneStatus.capabilities.contains(.botThreads) {
+            let agent = try #require(try await relaunched.listProfiles().first { !$0.isDefault })
+            let config = RunConfiguration(profileID: agent.id, hostID: host.id)
+            let a = try await relaunched.createConversation(configuration: config)
+            let b = try await relaunched.createConversation(configuration: config)
+            #expect(a.id != b.id && a.botID == agent.id && b.botID == agent.id)
+            for c in [a,b] {
+                let r = try await relaunched.send(OutgoingMessage(text: "Safe independent agent greeting"), conversationID: c.id, configuration: config)
+                try await wait { collector.runs[r.id]?.state == .completed }
+                #expect(try await relaunched.messages(conversationID: c.id).contains { $0.role == .assistant && $0.plainText == "Local Studio stream complete." })
+            }
+        }
+        let capture = CaptureRecord(hostID: host.id, kind: .note, text: "  Exact *capture*\n\nPreserve trailing spaces  ")
+        let captureID = try await relaunched.saveCapture(capture)
+        #expect(try await relaunched.saveCapture(capture) == captureID)
         // Provision this simulator's production composition for the opt-in UI
         // smoke test without exposing the bearer to XCTest typing/launch logs.
         let uiCredentials=KeychainBridgeCredentialStore()

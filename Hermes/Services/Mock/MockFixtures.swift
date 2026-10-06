@@ -52,7 +52,7 @@ struct MockFixtures {
 
     static func standard(now: Date = .now) -> MockFixtures {
         let clock = MockClock(now: now)
-        return MockFixtures(
+        var fixtures = MockFixtures(
             hosts: hosts,
             hostStatuses: hostStatuses(clock),
             profiles: profiles,
@@ -69,6 +69,8 @@ struct MockFixtures {
             integrations: integrations(clock),
             logs: logs(clock)
         )
+        fixtures.addVNext(now: now)
+        return fixtures
     }
 
     // MARK: Hosts

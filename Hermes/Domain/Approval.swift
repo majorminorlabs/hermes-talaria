@@ -29,6 +29,9 @@ nonisolated struct ApprovalRequest: Identifiable, Hashable, Codable, Sendable {
     var clarificationQuestion: String? = nil
     var clarificationChoices: [String]? = nil
 
+    var recommendedChoice: String? = nil
+    var onTimeout: String? = nil
+
     var isClarification: Bool { clarificationQuestion != nil }
 
     var headline: String {

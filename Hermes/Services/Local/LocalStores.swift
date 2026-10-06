@@ -31,14 +31,22 @@ final class SavedHostStore {
 final class SnapshotCache {
     private var directory: URL
     private let base: URL
+    private let isTemporary: Bool
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(directory: URL? = nil) {
         let base = directory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        self.isTemporary = base.path.hasPrefix(FileManager.default.temporaryDirectory.path)
         self.base = base
         self.directory = base.appendingPathComponent("HermesSnapshots", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
+    }
+
+    var queueDirectory: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        // Named/ephemeral environments keep isolated queues beside their caches.
+        return isTemporary ? base.appendingPathComponent("VNextOutbox") : support.appendingPathComponent("TalariaOutbox")
     }
 
     func scope(to hostID: String) {

@@ -72,7 +72,8 @@ struct CameraCapture: UIViewControllerRepresentable {
     private var generation = UUID()
     private var tapped = false
     private var onWords: ((String) -> Void)?
-    func start(words: @escaping (String) -> Void) async throws {
+    private(set) var audioURL: URL?
+    func start(recordAudio: Bool = false, words: @escaping (String) -> Void) async throws {
         guard !isRecording && !isStarting else { return }
         isStarting = true; defer { isStarting = false }
         generation = UUID(); let pending = generation
@@ -98,7 +99,13 @@ struct CameraCapture: UIViewControllerRepresentable {
         }
         let input = engine.inputNode; let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { stop(); throw HermesError.rejected("Microphone input is unavailable") }
-        let sink = SpeechAudioSink(request)
+        var recording: AVAudioFile?
+        if recordAudio {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".m4a")
+            recording = try AVAudioFile(forWriting: url, settings: [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: format.sampleRate, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 32000])
+            audioURL = url
+        }
+        let sink = SpeechAudioSink(request, recording: recording)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in sink.append(buffer) }; tapped = true
         engine.prepare()
         do { try engine.start(); isRecording = true } catch { stop(); throw HermesError.rejected("Microphone could not start") }
@@ -129,6 +136,12 @@ struct CameraCapture: UIViewControllerRepresentable {
             }
         }
     }
+    func finish() async {
+        engine.stop(); if tapped { engine.inputNode.removeTap(onBus: 0); tapped = false }
+        request?.endAudio()
+        try? await Task.sleep(for: .seconds(1.5))
+        stop()
+    }
     func stop() {
         generation = UUID(); task?.cancel(); task = nil
         engine.stop(); if tapped { engine.inputNode.removeTap(onBus: 0); tapped = false }
@@ -137,6 +150,7 @@ struct CameraCapture: UIViewControllerRepresentable {
     }
     func cancel() {
         generation = UUID(); stop(); task?.cancel(); task = nil; request = nil; onWords = nil; status = ""
+        if let audioURL { try? FileManager.default.removeItem(at: audioURL) }; audioURL = nil
     }
 }
 
@@ -144,6 +158,31 @@ struct CameraCapture: UIViewControllerRepresentable {
 // from AVAudioEngine's render callback. UI state remains isolated to MainActor.
 nonisolated private final class SpeechAudioSink: @unchecked Sendable {
     private let request: SFSpeechAudioBufferRecognitionRequest
-    init(_ request: SFSpeechAudioBufferRecognitionRequest) { self.request = request }
-    func append(_ buffer: AVAudioPCMBuffer) { request.append(buffer) }
+    private let recording: AVAudioFile?
+    init(_ request: SFSpeechAudioBufferRecognitionRequest, recording: AVAudioFile? = nil) { self.request = request; self.recording = recording }
+    func append(_ buffer: AVAudioPCMBuffer) {
+        request.append(buffer)
+        guard let recording else { return }
+        if buffer.format.channelCount == recording.processingFormat.channelCount { try? recording.write(from: buffer); return }
+        guard let converter = AVAudioConverter(from: buffer.format, to: recording.processingFormat),
+              let mono = AVAudioPCMBuffer(pcmFormat: recording.processingFormat, frameCapacity: buffer.frameLength) else { return }
+        let input = AudioBufferOnce(buffer)
+        var error: NSError?
+        converter.convert(to: mono, error: &error) { _, status in
+            guard let next = input.take() else { status.pointee = .noDataNow; return nil }
+            status.pointee = .haveData; return next
+        }
+        if error == nil { try? recording.write(from: mono) }
+    }
+}
+
+/// AVAudioConverter's input callback is Sendable; the one-shot flag is locked.
+nonisolated private final class AudioBufferOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var buffer: AVAudioPCMBuffer?
+    init(_ buffer: AVAudioPCMBuffer) { self.buffer = buffer }
+    func take() -> AVAudioPCMBuffer? {
+        lock.lock(); defer { lock.unlock() }
+        let next = buffer; buffer = nil; return next
+    }
 }

@@ -17,12 +17,6 @@ struct SettingsView: View {
                     set: { id in Task { await connection.switchHost(to: id) } })) {
                     ForEach(connection.hosts) { Text($0.name).tag($0.id) }
                 }
-                if connection.supports(.profiles) {
-                    Picker("Profile for new chats", selection: $preferences.defaultProfileID) {
-                        Text("Hermes (default)").tag(String?.none)
-                        ForEach(profiles.bots) { Text($0.name).tag(String?.some($0.id)) }
-                    }
-                }
                 Picker("Reasoning", selection: $preferences.defaultReasoning) {
                     ForEach(ReasoningLevel.allCases) { Text($0.label).tag($0) }
                 }
@@ -44,6 +38,7 @@ struct SettingsView: View {
                     ForEach(AppearancePreference.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Toggle("Review voice before sending", isOn: $preferences.reviewVoiceBeforeSending)
                 Toggle("Haptics", isOn: $preferences.hapticsEnabled)
             } header: {
                 SectionHeader("Appearance")
@@ -86,14 +81,13 @@ struct SettingsView: View {
             } header: {
                 SectionHeader("Local Data")
             } footer: {
-                Text("Hermes on your Mac is the source of truth. Talaria keeps only preferences, saved hosts, drafts and last-known snapshots for fast launch.")
+                Text("Hermes on your Mac is the source of truth. Talaria keeps preferences, saved hosts, drafts, last-known snapshots, and a durable Outbox of captures and unsent asks. Clearing snapshots does not clear the Outbox.")
             }
 
             Section {
                 Toggle("Show Diagnostics", isOn: $preferences.showDeveloperDiagnostics)
                 if preferences.showDeveloperDiagnostics {
                     NavigationLink(value: Route.capabilities) { Text("Capabilities") }
-                    NavigationLink(value: Route.logs) { Text("Logs") }
                 }
             } header: {
                 SectionHeader("Developer")
@@ -175,6 +169,9 @@ private struct SimulationSection: View {
                 Text("3×").tag(3.0)
                 Text("10×").tag(10.0)
             }
+            Button("Expire clarification now") { simulator.expireClarifications() }
+            Toggle("Make next send uncertain", isOn: $controls.nextSendUncertain)
+            Toggle("Fail capture sync", isOn: $controls.failCaptureSync)
             Toggle("Fail requests", isOn: $controls.failRequests)
             Toggle("Empty account", isOn: $controls.emptyData)
                 .onChange(of: controls.emptyData) {

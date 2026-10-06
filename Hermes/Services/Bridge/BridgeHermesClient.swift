@@ -3,7 +3,7 @@ import Foundation
 /// One aggregate, one SSE subscription. Studio remains the owner of execution.
 final class BridgeHermesClient: HostService, HomeService, ConversationService, RunService, ProfileService,
     TaskService, ScheduleService, MemoryService, SkillService, ToolService, IntegrationService, UsageService,
-    LogService, HermesEventStream, ArtifactService {
+    LogService, HermesEventStream, ArtifactService, CaptureService {
     private let credentials: any BridgeCredentialStore
     private let session: URLSession
     private let defaults: UserDefaults
@@ -36,10 +36,10 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
     private var profileIDs: [String] { capabilityJSON["profiles"].object.keys.sorted() }
     private var primaryProfile: String { profileIDs.contains("default") ? "default" : (profileIDs.first ?? "default") }
     private func requireTransport() throws -> BridgeTransport { guard let transport else { throw HermesError.bridgeUnreachable }; return transport }
-    private func request(_ path: String, method: String = "GET", body: BridgeJSON? = nil, query: [String:String] = [:], responseTimeout: TimeInterval? = nil) async throws -> BridgeJSON {
+    private func request(_ path: String, method: String = "GET", body: BridgeJSON? = nil, query: [String:String] = [:], responseTimeout: TimeInterval? = nil, commandID suppliedID: UUID? = nil) async throws -> BridgeJSON {
         let t = try requireTransport()
         let origin = host?.bridgeURL
-        let commandID = method == "GET" ? nil : UUID()
+        let commandID = method == "GET" ? nil : (suppliedID ?? UUID())
         if let commandID { recordCommand(commandID, method: method, path: path, state: "pending") }
         do {
             let result = try await t.request(method: method, path: path, query: query,
@@ -178,6 +178,12 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         }
         knownConversations[c.id] = c; return c
     }
+    func searchConversations(_ query: String) async throws -> [Conversation] {
+        try check(.sessions)
+        var matches: [Conversation] = []
+        for p in profileIDs { let page = try await request("/conversations", query: ["profile": p, "q": query, "limit": "100"]); matches += page["conversations"].array.map(remember) }
+        return matches
+    }
     func listConversations() async throws -> [Conversation] {
         try check(.sessions)
         var rows: [Conversation] = []
@@ -254,15 +260,54 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         if let text = j.string { return text }
         return j.array.compactMap { $0["text"].string }.joined(separator: "\n")
     }
-    func createConversation(configuration: RunConfiguration) async throws -> Conversation {
+    func createConversation(configuration: RunConfiguration) async throws -> Conversation { try await createConversation(configuration: configuration, commandID: UUID()) }
+    func createConversation(configuration: RunConfiguration, commandID: UUID) async throws -> Conversation {
         try check(.sessions)
         var body: [String:BridgeJSON] = ["reasoning_effort": .string(configuration.reasoning == .off || configuration.model?.supportsReasoning == false ? "none" : configuration.reasoning.rawValue)]
         if let m = configuration.model { body["model"] = .string(m.id); body["provider"] = .string(m.provider) }
         if let w = configuration.project { body["workspace"] = .string(w.path) }
-        let j = try await request("/conversations", method: "POST", body: .object(body), query:["profile": configuration.profileID])
+        let isBot = discoveredBotMode && !profileIDs.contains(configuration.profileID)
+        if isBot && !currentStatus.capabilities.contains(.botThreads) {
+            guard configuration.model == nil, configuration.project == nil else { throw HermesError.unsupported(.botThreads) }
+            guard let c = try await canonicalConversation(profileID: configuration.profileID) else { throw HermesError.unsupported(.botChat) }
+            return c
+        }
+        if isBot && configuration.model == nil { body.removeValue(forKey: "reasoning_effort") }
+        let path = isBot ? "/bots/\(try resource(configuration.profileID))/conversations" : "/conversations"
+        let j = try await request(path, method: "POST", body: .object(body), query: isBot ? [:] : ["profile": configuration.profileID], commandID: commandID)
         var c = remember(j); c.project = configuration.project; knownConversations[c.id] = c
         continuation?.yield(.init(cursor: .init(value:""), event: .conversationUpserted(c)))
         return c
+    }
+    func commandObservation(_ id: UUID, creating: Bool) async throws -> CommandObservation {
+        let receipt = try await request("/commands/\(id.uuidString)")
+        if receipt["state"].string == "not_received" { return .notReceived }
+        guard receipt["state"].string == "done", let status = receipt["result"]["status"].int else { return .pending }
+        let body = receipt["result"]["body"]
+        guard (200..<300).contains(status) else { return .rejected(body["error"]["message"].string ?? "Command was rejected") }
+        if creating { return .conversation(remember(body)) }
+        let mapped = materializeSnapshot(body)
+        return .run(mapped)
+    }
+    func setArchived(_ archived: Bool, conversationID: String) async throws {
+        let c = remember(try await request("/conversations/\(resource(conversationID))", method: "PATCH", body: .object(["archived": .bool(archived)])))
+        continuation?.yield(.init(cursor: .init(value: ""), event: .conversationUpserted(c)))
+    }
+    func uploadCaptureMedia(_ media: LocalMedia) async throws -> String {
+        let result = try await request("/captures/uploads", method: "POST", body: .object([
+            "name": .string(media.name), "content_type": .string(media.contentType),
+            "content_base64": .string(media.data.base64EncodedString())]), commandID: media.id)
+        guard let id = result["upload_id"].string else { throw HermesError.rejected("Bridge did not confirm the capture upload") }
+        return id
+    }
+    func saveCapture(_ capture: CaptureRecord) async throws -> String {
+        let j = try await request("/captures", method: "POST", body: .object([
+            "client_capture_id": .string(capture.id.uuidString), "created_at": .string(ISO8601DateFormatter().string(from: capture.createdAt)),
+            "kind": .string(capture.kind.rawValue), "text": .string(capture.text),
+            "attachment_ids": .array(capture.media.compactMap { $0.uploadID }.map { .string($0) }),
+            "context": .object(capture.context.map { key, value in (key, key == "transcribed_on_device" ? BridgeJSON.bool(value == "true") : .string(value)) }.reduce(into: [String:BridgeJSON]()) { $0[$1.0] = $1.1 })]), commandID: capture.id)
+        guard let id = j["capture_id"].string else { throw HermesError.rejected("Bridge did not confirm capture persistence") }
+        return id
     }
     func resumeConversation(id: String) async throws { _ = try await request("/conversations/\(resource(id))/resume", method:"POST") }
     func renameConversation(id: String, title: String) async throws {
@@ -280,7 +325,8 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         if var c = knownConversations[conversationID] { c.isPinned = pinned; knownConversations[c.id] = c; continuation?.yield(.init(cursor: .init(value:""), event:.conversationUpserted(c))) }
     }
     private var stagedAttachments: [String: String] = [:]
-    func send(_ message: OutgoingMessage, conversationID: String, configuration: RunConfiguration) async throws -> Run {
+    func send(_ message: OutgoingMessage, conversationID: String, configuration: RunConfiguration) async throws -> Run { try await send(message, conversationID: conversationID, configuration: configuration, commandID: UUID()) }
+    func send(_ message: OutgoingMessage, conversationID: String, configuration: RunConfiguration, commandID: UUID) async throws -> Run {
         try check(.runs)
         var uploaded: [BridgeJSON] = []
         if !message.attachments.isEmpty { try check(.attachments) }
@@ -291,12 +337,12 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
                   let mime = file.contentType else { throw HermesError.rejected("Attachment is unavailable or exceeds 10 MiB") }
             let result = try await request("/attachments", method:"POST", body:.object([
                 "conversation_id":.string(conversationID), "name":.string(file.name),
-                "content_type":.string(mime), "content_base64":.string(data.base64EncodedString())]))
+                "content_type":.string(mime), "content_base64":.string(data.base64EncodedString())]), commandID: UUID(uuidString: file.id))
             guard let id = result["upload_id"].string else { throw HermesError.rejected("Bridge did not confirm the upload") }
             stagedAttachments[cacheKey] = id; uploaded.append(.string(id))
         }
         let j = try await request("/conversations/\(resource(conversationID))/runs", method:"POST", body:.object([
-            "text":.string(message.text.isEmpty ? "Please inspect the attached files." : message.text), "attachment_ids":.array(uploaded)]))
+            "text":.string(message.text.isEmpty ? "Please inspect the attached files." : message.text), "attachment_ids":.array(uploaded)]), commandID: commandID)
         for file in message.attachments { stagedAttachments["\(hostID):\(conversationID):\(file.id)"] = nil }
         let run = materializeSnapshot(j)
         // Refresh the canonical user row, not an optimistic duplicate.
@@ -482,7 +528,7 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
     }
     func createTask(_ draft: TaskDraft) async throws -> HermesTask {
         try check(.kanban)
-        let p = draft.assigneeProfileID ?? primaryProfile
+        let p = draft.assigneeProfileID.flatMap { profileIDs.contains($0) ? $0 : nil } ?? primaryProfile
         guard let board = capabilityJSON["profiles"][p]["boards"].array.first?.string else { throw HermesError.unsupported(.kanban) }
         var body: [String:BridgeJSON] = ["title":.string(draft.title),"body":.string(draft.summary),"priority":.number(Double(draft.priority.rawValue))]
         if let assignee = draft.assigneeProfileID { body["assignee"] = .string(assignee) }
@@ -490,6 +536,9 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         let j = try await request("/kanban/tasks", method:"POST",body:.object(body),query:["profile":p,"board":board])
         let task = try await taskDetail(id:j["id"].string ?? "")
         continuation?.yield(.init(cursor:.init(value:""),event:.taskUpserted(task))); return task
+    }
+    func review(taskID: String, status: TaskStatus, summary: String) async throws {
+        _ = try await request("/kanban/tasks/\(resource(taskID))", method: "PATCH", body: .object(["status": .string(BridgeMapping.sourceStatus(status)), "summary": .string(summary)]))
     }
     func setStatus(_ status: TaskStatus, taskID: String) async throws {
         let task = try await taskDetail(id:taskID)
@@ -567,7 +616,7 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         try check(.artifacts)
         let j = try await request("/conversations/\(resource(conversationID))/artifacts")
         return j["artifacts"].array.map { FileAttachment(id:$0["id"].string ?? "",name:$0["name"].string ?? "Artifact",byteCount:$0["size"].int ?? 0,
-            fileExtension:($0["name"].string ?? "").split(separator:".").last.map(String.init) ?? "",path:nil) }
+            fileExtension:($0["name"].string ?? "").split(separator:".").last.map(String.init) ?? "",path:nil, runID: $0["run_id"].string) }
     }
     func downloadArtifact(id: String) async throws -> URL {
         let metadata = try await request("/artifacts/\(resource(id))")

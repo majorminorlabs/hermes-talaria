@@ -134,4 +134,23 @@ struct TalariaDesignTests {
         #expect(abs(darkRed - 0xE7 / 255.0) < 0.01)
         #expect(abs(lightRed - 0xCF / 255.0) < 0.01)
     }
+    @Test func secondaryTextContrastOnPanelsAndAttentionWash() {
+        func components(_ color: UIColor, style: UIUserInterfaceStyle) -> (Double,Double,Double,Double) {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            color.resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+            return (Double(r), Double(g), Double(b), Double(a))
+        }
+        func luminance(_ rgb: [Double]) -> Double { let c = rgb.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }; return c[0]*0.2126 + c[1]*0.7152 + c[2]*0.0722 }
+        for style in [UIUserInterfaceStyle.light,.dark] {
+            let text = components(Theme.adaptiveUIColor(light: 0x55545E,dark: 0xB9B7C2), style: style)
+            let panel = components(.secondarySystemBackground, style: style)
+            let wash = components(Theme.adaptiveUIColor(light: 0xB9530C,dark: 0xF5A04A),style:style)
+            let alpha = style == .dark ? 0.12 : 0.07
+            for background in [[panel.0,panel.1,panel.2], [wash.0*alpha + panel.0*(1-alpha),wash.1*alpha + panel.1*(1-alpha),wash.2*alpha + panel.2*(1-alpha)]] {
+                let a = luminance([text.0,text.1,text.2]), b = luminance(background)
+                #expect((max(a,b)+0.05)/(min(a,b)+0.05) >= 4.5)
+            }
+        }
+    }
+
 }

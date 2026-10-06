@@ -17,6 +17,7 @@ nonisolated struct Conversation: Identifiable, Hashable, Codable, Sendable {
     var isPinned: Bool
     var messageCount: Int
     var readOnly: Bool? = nil
+    var isArchived: Bool? = nil
     /// Canonical Bot Chat metadata. `profileID` remains the opaque mobile bot ID;
     /// the native profile name is retained separately for profile-scoped reads.
     var isBotChat: Bool? = nil
@@ -136,7 +137,8 @@ nonisolated struct FileAttachment: Identifiable, Hashable, Codable, Sendable {
     /// Composer-only bytes are excluded from persisted transcripts and caches.
     var data: Data? = nil
     var contentType: String? = nil
-    enum CodingKeys: String, CodingKey { case id, name, byteCount, fileExtension, path, contentType }
+    var runID: String? = nil
+    enum CodingKeys: String, CodingKey { case id, name, byteCount, fileExtension, path, contentType, runID }
 
     var symbol: String {
         switch fileExtension.lowercased() {

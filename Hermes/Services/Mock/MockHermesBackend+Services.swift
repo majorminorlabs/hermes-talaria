@@ -52,6 +52,7 @@ extension MockHermesBackend: ConversationService {
     }
 
     func send(_ outgoing: OutgoingMessage, conversationID: String, configuration: RunConfiguration) async throws -> Run {
+        if simulation.nextSendUncertain { simulation.nextSendUncertain = false; throw HermesError.commandUncertain(nil) }
         let conversation = try await perform(.sessions) { () throws -> Conversation in
             guard let conversation = conversations[conversationID] else { throw HermesError.notFound }
             guard conversation.activeRunID == nil else {
@@ -220,7 +221,7 @@ extension MockHermesBackend: ProfileService {
     }
     func botInventory(profileID: String?) async throws -> BotInventory {
         try await perform(.profiles) {
-            let models = Array(Set(profiles.values.map(\.model)))
+            let models = Array(Set(MockModels.all + profiles.values.map(\.model)))
             let providers = Dictionary(grouping:models,by:\.provider).map { provider, models in
                 BridgeJSON.object(["id":.string(provider),"name":.string(provider),"available":.bool(true),"models":.array(models.map { .object(["id":.string($0.id),"name":.string($0.displayName)]) })])
             }

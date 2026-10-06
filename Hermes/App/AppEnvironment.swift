@@ -20,6 +20,13 @@ final class AppEnvironment {
     let profiles: ProfileStore
     let tasks: TaskStore
     let routines: RoutineStore
+    let work: WorkItemStore
+    let needsYou: NeedsYouStore
+    let seen: SeenStore
+    let snoozes: SnoozeStore
+    let outbox: OutboxStore
+    let voice = VoiceSession()
+    let agentModels: AgentModelStore
 
     var isInBackground = false
 
@@ -38,6 +45,9 @@ final class AppEnvironment {
         self.cache = cache
         self.drafts = drafts
         self.notifier = notifier
+        agentModels = AgentModelStore(defaults: preferences.defaults)
+        let queueBase = cache.queueDirectory
+        outbox = OutboxStore(directory: queueBase)
         connection = ConnectionStore(client: client, savedHosts: savedHosts, cache: cache, defaultHosts: defaultHosts)
         home = HomeStore(client: client, cache: cache)
         activity = ActivityStore(client: client, cache: cache)
@@ -45,6 +55,10 @@ final class AppEnvironment {
         profiles = ProfileStore(client: client, cache: cache)
         tasks = TaskStore(client: client, cache: cache)
         routines = RoutineStore(client: client, cache: cache)
+        seen = SeenStore(defaults: preferences.defaults)
+        snoozes = SnoozeStore(defaults: preferences.defaults)
+        needsYou = NeedsYouStore(activity: activity, tasks: tasks, home: home, routines: routines, connection: connection, snoozes: snoozes, outbox: outbox)
+        work = WorkItemStore(conversations: conversations, activity: activity, tasks: tasks, needs: needsYou, seen: seen, connection: connection)
         lastCursor = cache.load(AppliedBridgeState.self, key: .appliedBridgeState)?.value.cursor ?? cache.load(EventCursor.self, key: .eventCursor)?.value
         if simulator == nil {
             connection.onHostSwitch = { [weak self] in
@@ -142,6 +156,8 @@ final class AppEnvironment {
         async let tasks: Void = refreshIfSupported(.kanban) { await self.tasks.refresh() }
         async let routines: Void = refreshIfSupported(.cron) { await self.routines.refresh() }
         _ = await (home, activity, conversations, profiles, tasks, routines)
+        work.seedSeen()
+        await outbox.syncCaptures(environment: self)
     }
 
     private func refreshIfSupported(_ capability: HermesCapability, _ refresh: () async -> Void) async {

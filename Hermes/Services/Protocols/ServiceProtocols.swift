@@ -18,9 +18,14 @@ protocol HomeService: AnyObject, Sendable {
 }
 
 protocol ConversationService: AnyObject, Sendable {
+    func searchConversations(_ query: String) async throws -> [Conversation]
     func listConversations() async throws -> [Conversation]
     func messages(conversationID: String) async throws -> [Message]
     func createConversation(configuration: RunConfiguration) async throws -> Conversation
+    func createConversation(configuration: RunConfiguration, commandID: UUID) async throws -> Conversation
+    func commandObservation(_ id: UUID, creating: Bool) async throws -> CommandObservation
+    func setArchived(_ archived: Bool, conversationID: String) async throws
+    func send(_ message: OutgoingMessage, conversationID: String, configuration: RunConfiguration, commandID: UUID) async throws -> Run
     func renameConversation(id: String, title: String) async throws
     func deleteConversation(id: String) async throws
     func setPinned(_ pinned: Bool, conversationID: String) async throws
@@ -88,6 +93,7 @@ protocol TaskService: AnyObject, Sendable {
     func listTasks() async throws -> [HermesTask]
     @discardableResult
     func createTask(_ draft: TaskDraft) async throws -> HermesTask
+    func review(taskID: String, status: TaskStatus, summary: String) async throws
     func setStatus(_ status: TaskStatus, taskID: String) async throws
     /// Dispatch a ready or blocked task to its assignee.
     func startTask(id: String) async throws
@@ -146,5 +152,20 @@ extension ProfileService {
     func profile(id: String) async throws -> Profile {
         guard let value = try await listProfiles().first(where: { $0.id == id }) else { throw HermesError.notFound }
         return value
+    }
+}
+
+extension ConversationService {
+    func searchConversations(_ query: String) async throws -> [Conversation] { try await listConversations().filter { $0.title.localizedCaseInsensitiveContains(query) || $0.preview.localizedCaseInsensitiveContains(query) } }
+    func commandObservation(_ id: UUID, creating: Bool) async throws -> CommandObservation { .pending }
+    func createConversation(configuration: RunConfiguration, commandID: UUID) async throws -> Conversation { try await createConversation(configuration: configuration) }
+    func send(_ message: OutgoingMessage, conversationID: String, configuration: RunConfiguration, commandID: UUID) async throws -> Run { try await send(message, conversationID: conversationID, configuration: configuration) }
+    func setArchived(_ archived: Bool, conversationID: String) async throws { throw HermesError.unsupported(.sessions) }
+}
+
+extension TaskService {
+    func review(taskID: String, status: TaskStatus, summary: String) async throws {
+        guard summary.isEmpty else { throw HermesError.rejected("This host does not support review notes") }
+        try await setStatus(status, taskID: taskID)
     }
 }

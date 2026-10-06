@@ -75,7 +75,7 @@ struct UsageView: View {
         }
 
         Section {
-            Button("Recent Runs", systemImage: "clock.arrow.circlepath") { router.showTasks(.completed) }
+            Button("Recent work", systemImage: "clock.arrow.circlepath") { router.selectedTab = .threads }
         } footer: {
             Text("Counts come from Hermes on your Mac. Costs aren't estimated here.")
         }

@@ -3,6 +3,7 @@ import SwiftUI
 /// The Studio's bots (Hermes Desktop Bot Mode), discovered live. New bots
 /// appear on refresh; each opens its own canonical chat.
 struct BotsView: View {
+    @Environment(AppEnvironment.self) private var environment
     @Environment(ProfileStore.self) private var profiles
     @Environment(ConnectionStore.self) private var connection
 
@@ -15,12 +16,12 @@ struct BotsView: View {
                 ConnectionNoticeSection()
                 if connection.supports(.profiles) {
                     Section {
-                        if profiles.bots.isEmpty {
-                            Text("No bots on this Mac yet.")
+                        if profiles.sorted.isEmpty {
+                            Text("No agents on this Mac yet.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        ForEach(profiles.bots) { profile in
+                        ForEach(profiles.sorted) { profile in
                             NavigationLink(value: Route.profile(profile.id)) {
                                 BotRow(profile: profile)
                             }
@@ -28,42 +29,31 @@ struct BotsView: View {
                     } header: {
                         SectionHeader(title: "On \(connection.activeHost?.name ?? "your Mac")") {
                             if !profiles.bots.isEmpty {
-                                Text("\(profiles.bots.count)").monospacedDigit().foregroundStyle(.tertiary)
+                                Text("\(profiles.bots.count)").monospacedDigit().foregroundStyle(Theme.secondaryText)
                             }
                         }
                     } footer: {
                         if connection.supports(.botMode) {
-                            Text("Bots and their chats are shared with Hermes Desktop.")
+                            Text("Hidden agents are managed in Hermes Desktop.")
                         }
                     }
                 }
 
-                if let defaultProfile = profiles.sorted.first(where: { $0.isDefault && $0.isBotMode != true }) {
-                    Section {
-                        NavigationLink(value: Route.profile(defaultProfile.id)) {
-                            BotRow(profile: defaultProfile)
-                        }
-                    } header: {
-                        SectionHeader("Default Profile")
-                    } footer: {
-                        if !connection.supports(.profiles) {
-                            Text("This host exposes a single profile.")
-                        }
-                    }
-                }
+
             }
             .listSectionSpacing(.compact)
             .refreshable { await profiles.refresh() }
         } empty: {
-            ContentUnavailableView("No Bots", systemImage: "person.2",
-                                   description: Text("Bots created in Hermes appear here."))
+            ContentUnavailableView("No Agents", systemImage: "person.2",
+                                   description: Text("Agents created in Hermes appear here."))
         }
-        .navigationTitle("Bots")
+        .navigationTitle("Agents")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { ConnectionChip() }
             ToolbarItem(placement: .topBarTrailing) {
                 if connection.supports(.botCreate) {
-                    Button("New Bot", systemImage: "plus") { creatingBot = true }
-                        .accessibilityLabel("Create Bot")
+                    Button("New Agent", systemImage: "plus") { creatingBot = true }
+                        .accessibilityLabel("Create Agent")
                 }
             }
         }
@@ -83,17 +73,18 @@ struct BotRow: View {
     var profile: Profile
 
     @Environment(ActivityStore.self) private var activity
+    @Environment(ConnectionStore.self) private var connection
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let run = activity.run(profile.currentRunID).flatMap { $0.state.isActive ? $0 : nil }
-        HStack(spacing: 12) {
+        (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             ProfileAvatarWithStatus(profile: profile, size: typeSize.isAccessibilitySize ? 36 : 44)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(profile.name)
                         .font(.body.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                     if profile.isDefault { Tag("Default") }
                     Spacer(minLength: 6)
                     if run == nil, let last = profile.lastActiveAt {
@@ -101,7 +92,7 @@ struct BotRow: View {
                             Text(Format.relative(last, now: context.date))
                                 .font(.caption)
                                 .monospacedDigit()
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -111,7 +102,7 @@ struct BotRow: View {
                 if let model = modelLine {
                     Text(model)
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
@@ -124,11 +115,11 @@ struct BotRow: View {
     private func activityLine(_ run: Run?) -> some View {
         if let run {
             HStack(spacing: 5) {
-                StatusDot(color: Theme.running, pulsing: true, size: 6)
-                Text(run.title).foregroundStyle(Theme.running)
+                StatusDot(color: run.displayState(isLive: connection.connection.isConnected).tint, pulsing: connection.connection.isConnected, size: 6)
+                Text("\(run.displayState(isLive: connection.connection.isConnected).label) · \(run.title)").foregroundStyle(run.displayState(isLive: connection.connection.isConnected).tint)
             }
         } else if profile.status == .needsAttention {
-            Text("Needs attention").foregroundStyle(Theme.attention)
+            Text("Needs you").foregroundStyle(Theme.attention)
         } else if let activity = profile.activitySummary, !activity.isEmpty {
             Text(activity).foregroundStyle(.secondary)
         } else if !profile.role.isEmpty {

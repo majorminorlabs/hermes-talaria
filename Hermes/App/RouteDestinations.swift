@@ -30,11 +30,17 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .run(let id):
-            RunDetailView(runID: id)
+            RunThreadDestination(runID: id)
+        case .board: KanbanView()
+        case .scheduled: ScheduledView()
+        case .studio: MoreView()
+        case .outbox: OutboxView()
+        case .snoozed: SnoozedView()
         case .approval(let id):
             ApprovalDetailView(approvalID: id)
-        case .conversation(let id):
-            ConversationView(model: environment.makeConversationModel(conversationID: id, profileID: nil))
+        case .thread(let id), .conversation(let id):
+            if id.hasPrefix("task:") { TaskDetailView(taskID: String(id.dropFirst(5))) }
+            else { ConversationView(model: environment.makeConversationModel(conversationID: id, profileID: nil)) }
         case .newConversation(let seed):
             ConversationView(model: environment.makeConversationModel(conversationID: nil, profileID: seed.profileID))
                 .id(seed.id)
@@ -42,7 +48,7 @@ struct RouteDestination: View {
             TaskDetailView(taskID: id)
         case .routine(let id):
             RoutineDetailView(routineID: id)
-        case .profile(let id):
+        case .agent(let id), .profile(let id):
             ProfileDetailView(profileID: id)
         case .hosts:
             HostsView()
@@ -50,10 +56,6 @@ struct RouteDestination: View {
             HostDetailView(hostID: id)
         case .usage:
             UsageView()
-        case .memory:
-            MemoryView()
-        case .memoryEntry(let entry):
-            MemoryDetailView(entry: entry)
         case .skills:
             SkillsView()
         case .skill(let skill):
@@ -64,10 +66,6 @@ struct RouteDestination: View {
             MCPView()
         case .mcpServer(let server):
             MCPServerDetailView(server: server)
-        case .integrations:
-            IntegrationsView()
-        case .logs:
-            LogsView()
         case .settings:
             SettingsView()
         case .capabilities:

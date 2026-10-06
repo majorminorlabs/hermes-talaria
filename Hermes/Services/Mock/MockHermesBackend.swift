@@ -24,6 +24,10 @@ final class MockHermesBackend {
     var integrationList: [Integration]
     var logEntries: [LogEntry]
 
+    var savedCaptures: [UUID: CaptureRecord] = [:]
+    var createdCommands: [UUID: Conversation] = [:]
+    var sentCommands: [UUID: Run] = [:]
+
     var activeHostID = MockID.studio
     /// Developer override for the Studio's connection state.
     var forcedConnection: ConnectionState?

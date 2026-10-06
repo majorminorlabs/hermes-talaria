@@ -61,6 +61,7 @@ struct ProfileAvatar: View {
 
 /// Avatar with a status dot in the corner. Idle and unknown show no dot.
 struct ProfileAvatarWithStatus: View {
+    @Environment(ConnectionStore.self) private var connection
     var profile: Profile?
     var size: CGFloat = 36
 
@@ -68,7 +69,7 @@ struct ProfileAvatarWithStatus: View {
         ProfileAvatar(profile: profile, size: size)
             .overlay(alignment: .bottomTrailing) {
                 if let status = profile?.status, status == .working || status == .needsAttention {
-                    StatusDot(color: status.tint, pulsing: status == .working, size: max(7, size * 0.22))
+                    StatusDot(color: status.tint, pulsing: status == .working && connection.connection.isConnected, size: max(7, size * 0.22))
                         .padding(2)
                         .background(Circle().fill(Color(uiColor: .systemBackground)))
                         .offset(x: 3, y: 3)
