@@ -25,7 +25,7 @@ final class ScreenTourTests: XCTestCase {
     }
 
     func testTour() throws {
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout: 10))
         settle(2); shot("01-now"); app.swipeUp(); shot("02-now-working"); app.swipeDown()
         tab("Threads"); settle(); shot("10-threads")
         if tapText("Researcher") { settle(); shot("11-thread-working"); if app.buttons["steps-button"].firstMatch.exists { app.buttons["steps-button"].firstMatch.tap(); settle(); shot("12-steps"); app.buttons["Done"].firstMatch.tap() }; back() }

@@ -6,7 +6,7 @@ final class InteractionTests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     private func launch(_ arguments: [String] = []) {
         app = XCUIApplication(); app.launchArguments = ["-uiTesting", "-resetState", "-runSpeed", "0.2"] + arguments; app.launch()
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:15))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:15))
     }
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
     private func text(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
@@ -73,7 +73,7 @@ final class InteractionTests: XCTestCase {
         app.buttons["capture-save"].tap(); XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'captures waiting'")).firstMatch.exists)
         app.terminate(); app.launchArguments = ["-uiTesting"]; app.launch()
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:10))
         let outbox = app.buttons.matching(NSPredicate(format:"label CONTAINS 'captures waiting' ")).firstMatch
         XCTAssertFalse(outbox.waitForExistence(timeout:3))
     }
@@ -125,6 +125,17 @@ final class InteractionTests: XCTestCase {
             app.navigationBars.buttons.element(boundBy:0).tap()
         }
     }
+    func testToolbarSlideDownLocksUntilStopped() {
+        launch()
+        let ask = app.buttons["ask-toolbar"]
+        let start = ask.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.5))
+        start.press(forDuration:1.0,thenDragTo:start.withOffset(CGVector(dx:0,dy:100)))
+        XCTAssertTrue(app.staticTexts["Locked"].waitForExistence(timeout:5))
+        XCTAssertFalse(app.buttons["ask-send"].exists)
+        XCTAssertTrue(app.buttons["held-voice-send"].isHittable)
+        app.buttons["held-voice-send"].tap()
+        XCTAssertTrue(app.staticTexts["Handed to Hermes"].waitForExistence(timeout:10))
+    }
     func testPushToTalkSlideLeftCancelSendsNothing() {
         launch(); openAsk("")
         let mic = app.buttons["Voice input"]
@@ -133,11 +144,11 @@ final class InteractionTests: XCTestCase {
         XCTAssertFalse(app.buttons["ask-send"].isEnabled)
         XCTAssertFalse(app.buttons["Stop dictation"].exists)
     }
-    func testPushToTalkSlideUpLocksUntilExplicitCancel() {
+    func testPushToTalkSlideDownLocksUntilExplicitCancel() {
         launch(); openAsk("")
         let mic = app.buttons["Voice input"]
         let start = app.coordinate(withNormalizedOffset: CGVector(dx:0,dy:0)).withOffset(CGVector(dx:mic.frame.midX,dy:mic.frame.midY))
-        start.press(forDuration:1.2,thenDragTo:start.withOffset(CGVector(dx:0,dy:-100)))
+        start.press(forDuration:1.2,thenDragTo:start.withOffset(CGVector(dx:0,dy:100)))
         XCTAssertTrue(app.staticTexts["Locked"].waitForExistence(timeout:5))
         app.buttons["Cancel"].firstMatch.tap()
         XCTAssertFalse(app.buttons["ask-send"].isEnabled)

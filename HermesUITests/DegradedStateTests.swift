@@ -16,7 +16,7 @@ final class DegradedStateTests: XCTestCase {
     func testDegradedStates() throws {
         // Populate the snapshot cache with a normal session first.
         let warmup = launch(["-resetState"])
-        XCTAssertTrue(warmup.navigationBars["Now"].waitForExistence(timeout: 10))
+        XCTAssertTrue(warmup.buttons["ask-toolbar"].waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 3)
         warmup.terminate()
 

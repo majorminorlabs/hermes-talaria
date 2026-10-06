@@ -47,12 +47,13 @@ struct BotsView: View {
             ContentUnavailableView("No Agents", systemImage: "person.2",
                                    description: Text("Agents created in Hermes appear here."))
         }
-        .navigationTitle("Agents")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { ConnectionChip() }
             ToolbarItem(placement: .topBarTrailing) {
                 if connection.supports(.botCreate) {
-                    Button("New Agent", systemImage: "plus") { creatingBot = true }
+                    Button { creatingBot = true } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
                         .accessibilityLabel("Create Agent")
                 }
             }

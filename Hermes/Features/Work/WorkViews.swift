@@ -98,7 +98,8 @@ struct NowView: View {
         .onAppear { focusNeeds(using: proxy) }
         }
         .sheet(item: $risk) { RiskConfirmSheet(action: $0) }
-        .navigationTitle("Now")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { ConnectionChip() }
             ToolbarItem(placement: .topBarTrailing) { AskToolbarButton() }
@@ -160,7 +161,8 @@ struct ThreadsView: View {
                 }
             }
         }.listStyle(.plain)
-        .navigationTitle("Threads")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Search threads")
         .task(id: query) {
             guard !query.isEmpty, environment.connection.connection.isConnected else { bridgeMatches = []; return }
@@ -176,7 +178,7 @@ struct ThreadsView: View {
                     Menu("Agent") { ForEach(environment.profiles.sorted) { p in Button { toggle(p.id, in: &agents) } label: { Label(p.name, systemImage: agents.contains(p.id) ? "checkmark" : "person") } } }
                     Menu("Source") { ForEach(Array(Set(environment.work.items.map(\.source))).sorted(), id: \.self) { source in Button { toggle(source, in: &sources) } label: { Label(source, systemImage: sources.contains(source) ? "checkmark" : "circle") } } }
                     if environment.connection.supports(.kanban) { NavigationLink("Board", value: Route.board) }
-                } label: { Image(systemName: "line.3.horizontal.decrease") }
+                } label: { Image(systemName: "line.3.horizontal.decrease").frame(width: 44, height: 44) }
             }
         }.refreshable { await environment.refreshAll() }
     }

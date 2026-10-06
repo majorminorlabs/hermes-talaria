@@ -147,7 +147,7 @@ final class SprintStudioUITests: XCTestCase {
         for _ in 0..<40 where !(hide.exists && hide.isHittable) { app.swipeUp() }  // Management section is last
         XCTAssertTrue(hide.waitForExistence(timeout:20));hide.tap()
         XCTAssertTrue(app.buttons["Hide Agent"].waitForExistence(timeout:15));evidence("Physical hide confirmation retains history",app);app.buttons["Hide Agent"].tap()
-        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout:120))
+        XCTAssertTrue(app.buttons["talaria-settings"].waitForExistence(timeout:120))
         let hidden=expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:row(probeName,app))
         XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:120),.completed);evidence("Phone bot hidden",app)
     }

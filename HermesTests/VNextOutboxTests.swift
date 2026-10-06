@@ -92,7 +92,7 @@ import Testing
     }
     @Test func lockRequestedWhileMicrophoneArmsSurvivesRelease() async throws {
         let voice = VoiceSession(); voice.start(capture: false, simulated: true)
-        voice.move(x: 0, y: -80); voice.release()
+        voice.move(x: 0, y: 80); voice.release()
         try await Task.sleep(for: .milliseconds(100))
         #expect(voice.phase == .locked)
         voice.cancel(); #expect(voice.phase == .cancelled)

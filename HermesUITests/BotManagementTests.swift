@@ -31,7 +31,7 @@ final class BotManagementTests: XCTestCase {
         let hide = app.buttons["Hide"]
         for _ in 0..<6 where !(hide.exists && hide.isHittable) { app.swipeUp() }
         XCTAssertTrue(hide.waitForExistence(timeout:10)); hide.tap(); app.buttons["Hide Agent"].tap()
-        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["talaria-settings"].waitForExistence(timeout:10))
         XCTAssertFalse(app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Edited phone fixture' AND NOT label BEGINSWITH 'Edited phone fixture (copy)'")).firstMatch.exists)
     }
 }

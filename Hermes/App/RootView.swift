@@ -59,13 +59,13 @@ struct RootView: View {
         @Bindable var router = router
         return TabView(selection: $router.selectedTab) {
             Tab("Now", systemImage: "circle.dotted.circle", value: AppTab.now) {
-                NavigationStack(path: router.path(for: .now)) { NowView().routeDestinations() }
+                NavigationStack(path: router.path(for: .now)) { NowView().routeDestinations() }.padding(.top, 12)
             }.badge(environment.needsYou.actionableCount)
             Tab("Threads", systemImage: "bubble.left.and.text.bubble.right", value: AppTab.threads) {
-                NavigationStack(path: router.path(for: .threads)) { ThreadsView().routeDestinations() }
+                NavigationStack(path: router.path(for: .threads)) { ThreadsView().routeDestinations() }.padding(.top, 12)
             }
             Tab("Agents", systemImage: "person.2", value: AppTab.agents) {
-                NavigationStack(path: router.path(for: .agents)) { BotsView().routeDestinations() }
+                NavigationStack(path: router.path(for: .agents)) { BotsView().routeDestinations() }.padding(.top, 12)
             }
         }
     }
@@ -79,7 +79,7 @@ private struct HeldVoiceOverlay: View {
             if router.heldVoiceAsk != nil || router.heldVoiceCapture {
                 ScrollView {
                     VoiceOverlay(session: environment.voice, send: { _, _ in }, edit: { _ in }, allowAutoSend: false,
-                                 targetName: environment.profiles.name(router.heldVoiceAsk?.agentID ?? Profile.defaultID))
+                                 targetName: environment.profiles.name(router.heldVoiceAsk?.agentID ?? Profile.defaultID), sendOnStop: router.heldVoiceAsk != nil)
                 }.fixedSize(horizontal: false, vertical: true).frame(maxHeight: 400)
                     .padding().padding(.bottom, 110)
             }

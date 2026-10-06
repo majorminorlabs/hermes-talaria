@@ -14,7 +14,7 @@ final class FormInputTests: XCTestCase {
     func testHostURLPortAndTokenAllowTypingAndPasting() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchArguments = ["-app.backendSimulation", "NO"]; app.launch()
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout: 15))
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Studio connection' ")).firstMatch.tap()
         let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Saved Hosts' ")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5)); saved.tap(); app.buttons["Add Host"].tap()

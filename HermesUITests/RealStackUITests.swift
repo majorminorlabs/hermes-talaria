@@ -10,7 +10,7 @@ final class RealStackUITests: XCTestCase {
         continueAfterFailure = false
         let app=XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:10))
         XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:20))
         app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap()
         let composer = app.textFields["ask-text"]

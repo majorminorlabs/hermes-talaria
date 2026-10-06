@@ -17,7 +17,7 @@ final class DesignTourTests: XCTestCase {
 
     func testDesignStates() throws {
         let app = XCUIApplication(); app.launchArguments = ["-uiTesting", "-resetState", "-pref.appearance", ProcessInfo.processInfo.environment["TOUR_APPEARANCE"] ?? "light"]; app.launch()
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10)); shot("design-now", app)
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:10)); shot("design-now", app)
         app.tabBars.buttons["Threads"].tap(); shot("design-threads", app)
         app.tabBars.buttons["Agents"].tap(); shot("design-agents", app)
         app.buttons["Create Agent"].tap(); XCTAssertTrue(app.textFields["bot-name"].waitForExistence(timeout:5)); shot("design-agent-editor", app); app.buttons["Cancel"].firstMatch.tap()
@@ -27,7 +27,7 @@ final class DesignTourTests: XCTestCase {
 
     func testLargeDynamicType() throws {
         let app = launch(["-resetState", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10)); shot("large-now",app)
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:10)); shot("large-now",app)
         app.tabBars.buttons["Threads"].tap(); shot("large-threads",app)
         app.tabBars.buttons["Agents"].tap(); shot("large-agents",app)
         app.tabBars.buttons["Now"].tap()

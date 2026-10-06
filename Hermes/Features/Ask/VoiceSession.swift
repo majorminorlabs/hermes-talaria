@@ -34,7 +34,7 @@ import SwiftUI
     func move(x: CGFloat, y: CGFloat) {
         guard phase == .listening || phase == .locked || phase == .arming else { return }
         if x <= -80 { cancel() }
-        else if y <= -60 { lockRequested = true; if phase == .listening { phase = .locked } }
+        else if y >= 60 { lockRequested = true; if phase == .listening { phase = .locked } }
     }
     func release() { if phase != .locked && !(phase == .arming && lockRequested) { finish() } }
     func finish() {
@@ -128,6 +128,7 @@ struct VoiceOverlay: View {
     var edit: (String) -> Void
     var allowAutoSend = true
     var targetName = "Hermes"
+    var sendOnStop = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reviewProgress = 0.0
     @Environment(AppEnvironment.self) private var environment
@@ -139,8 +140,13 @@ struct VoiceOverlay: View {
             if session.phase == .listening || session.phase == .locked {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in Text("\(session.secondsRemaining)s remaining").font(.caption).foregroundStyle(Theme.secondaryText) }
                 Text(session.dictation.status).font(.footnote).foregroundStyle(Theme.secondaryText)
-                Label(session.phase == .locked ? "Locked" : "Slide up to lock · slide left to cancel", systemImage: session.phase == .locked ? "lock.fill" : "waveform")
-                Button("Stop dictation") { session.finish() }.frame(minHeight: 44)
+                Label(session.phase == .locked ? "Locked" : "Slide down to lock · slide left to cancel", systemImage: session.phase == .locked ? "lock.fill" : "waveform")
+                if sendOnStop {
+                    Button("Send") { session.finish() }.buttonStyle(.borderedProminent)
+                        .frame(minHeight: 44).accessibilityIdentifier("held-voice-send")
+                } else {
+                    Button("Stop dictation") { session.finish() }.frame(minHeight: 44)
+                }
             }
             if session.phase == .review {
                 Button(session.isCapture ? "Save" : "Send") { finish() }.overlay { Circle().trim(from: 0, to: reviewProgress).stroke(.tint, lineWidth: 2).allowsHitTesting(false) }.buttonStyle(.borderedProminent).frame(minHeight: 44)
