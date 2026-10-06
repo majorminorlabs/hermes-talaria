@@ -69,3 +69,21 @@ htmlcov/
 .pairing
 *.mobiledevicepairing
 /Signing.local.*
+
+# Private runtime stores and durable Capture/Ask queues
+captures/
+capture-inbox/
+uploads/
+TalariaOutbox/
+VNextOutbox/
+HermesSnapshots/
+hermes-mobile-bridge/state/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.pfx
+*.certSigningRequest
+*.tmp
+*.bak

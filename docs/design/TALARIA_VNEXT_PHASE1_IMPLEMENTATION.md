@@ -1,5 +1,11 @@
 # Talaria vNext Phase 1 implementation
 
+Historical Phase 1 evidence. Current 0.2.0 source also includes the
+[Live Activity extension](TALARIA_LIVE_ACTIVITY.md), unified headers, down-to-lock
+voice gestures, held Ask send-on-release and SSE recovery fixes. See the
+[current user guide](../USING_TALARIA.md); historical limitations below apply to
+this original implementation revision.
+
 The implementation follows [TALARIA_VNEXT_UX.md](TALARIA_VNEXT_UX.md), with the product decisions in the supplied Phase 1 brief: independent Agent threads, dedicated bridge-managed captures, deterministic Auto routing to Hermes, and iOS 18 support. This is unreleased development work; the public v0.1.0 IPA and physical iPhone installation are unchanged.
 
 ## Implemented boundary
@@ -9,7 +15,7 @@ The implementation follows [TALARIA_VNEXT_UX.md](TALARIA_VNEXT_UX.md), with the 
 - **Threads** retain streaming, steer, follow-up, artifacts and message history. Work status, collapsed steps, result footers, handoff markers and Steps/Details replace the separate Run Detail shell. Unknown outcomes remain distinct from lost connectivity; stale snapshots cannot flip a terminal run back to running.
 - **Agents** retain the real configuration editor and expose independent Ask, current work, recent threads, model scope, local change history/Revert and real routine pause/resume. Revert checks the current server default before changing it. Session reasoning is shown only when reported; Agent reasoning remains a Mac handoff.
 - **Ask** exposes deterministic name/alias routing and the destination before sending. Ambiguous aliases require a choice. Model/provider, reasoning and project overrides apply at creation. Sending returns to the prior screen with an Open toast. Offline Asks require explicit Send now; uncertain commands require receipt inspection and are never automatically replayed.
-- **Voice** wraps the existing dictation engine with hold, slide-left cancellation, slide-up lock, a 60-second fuse, transcript review and optional 1.5-second automatic Ask sending. Capture and clarification answers require explicit confirmation. Global holds keep the native accessory in place and open the voice sheet after release, avoiding gesture cancellation during presentation. Voice sheets open at the large detent. The hold modifier uses native long-press/tap recognizers behind the SwiftUI content rather than the proposed sequenced SwiftUI gesture: the native accessory intermittently interpreted short taps as holds with the combined SwiftUI recognizers. The 250 ms threshold and lock/cancel semantics are unchanged. Drag deltas use the original finger-down position; actual touch timestamps distinguish a delayed short tap from a hold.
+- **Voice** wraps the existing dictation engine with hold, slide-left cancellation, slide-down lock (updated after this report), a 60-second fuse, transcript review and optional 1.5-second automatic Ask sending. Capture and clarification answers require explicit confirmation. Global holds keep the native accessory in place and open the voice sheet after release, avoiding gesture cancellation during presentation. Voice sheets open at the large detent. The hold modifier uses native long-press/tap recognizers behind the SwiftUI content rather than the proposed sequenced SwiftUI gesture: the native accessory intermittently interpreted short taps as holds with the combined SwiftUI recognizers. The 250 ms threshold and lock/cancel semantics are unchanged. Drag deltas use the original finger-down position; actual touch timestamps distinguish a delayed short tap from a hold.
 - **Capture** preserves text exactly, with separate kind/context/attachments, Photos/Files/camera entry points, voice audio and on-device recognition metadata. The private local file-backed queue survives relaunch and syncs captures automatically. “Saved to Hermes” requires an acknowledged stable capture ID. Plain links are stored without fetching.
 
 ## Bridge additions

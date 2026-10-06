@@ -1,3 +1,7 @@
+> This guide installs the older v0.1.0 download. Current 0.2.0 features require
+> an [Xcode source build](XCODE_INSTALL.md); no new IPA is published in this update.
+> Current pairing is Studio → Hosts; the v0.1.0 IPA uses More → Saved Hosts.
+
 # Talaria with official SideStore
 
 Talaria is MAJOR//MINOR's native iPhone companion for the Hermes backend on your

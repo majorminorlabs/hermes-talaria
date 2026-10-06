@@ -1,3 +1,7 @@
+> Historical implementation/design reference. For current 0.2.0 navigation,
+> Capture/voice semantics and capability boundaries, see [Use Talaria](docs/USING_TALARIA.md)
+> and [current release notes](CHANGELOG.md). Agents are underlying Hermes bots/profiles.
+
 # iOS integration with Hermes mobile bridge
 
 The native Swift client is implemented in Hermes/Services/Bridge and composed by AppEnvironment.live(). Its completed service mapping is [INTEGRATION_POINTS.md](INTEGRATION_POINTS.md). The client uses [BRIDGE_API.md](BRIDGE_API.md), not the upstream desktop RPC protocol. Studio executes everything.

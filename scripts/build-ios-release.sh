@@ -58,6 +58,9 @@ while (($#)); do
   esac
 done
 
+VERSION="$(/usr/bin/sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/hermes-mobile-bridge/pyproject.toml" | /usr/bin/head -n 1)"
+[[ -n "$VERSION" ]] || { echo "Missing release version." >&2; exit 1; }
+
 if ((ALLOW_UNVALIDATED_IPA)) && { (( ! SIDESTORE_IPA )) || [[ -n "$PHYSICAL_REPORT" ]]; }; then
   echo "--allow-unvalidated-ipa requires --sidestore-ipa and excludes a physical report." >&2
   exit 2
@@ -75,6 +78,10 @@ if ((SIDESTORE_IPA && ! ALLOW_UNVALIDATED_IPA)); then
     echo "Physical PASS must explicitly cover validation_bundle_identifier: xyz.majorminor.talaria." >&2
     exit 2
   fi
+  if ! /usr/bin/grep -Fxq "validation_version: $VERSION" "$PHYSICAL_REPORT"; then
+    echo "Physical PASS must explicitly cover validation_version: $VERSION." >&2
+    exit 2
+  fi
 fi
 
 for command in xcodebuild git python3 shasum unzip zip; do
@@ -90,8 +97,6 @@ if [[ "$OUTPUT_DIR" == "/" || "$OUTPUT_DIR" == "$ROOT" ]]; then
   echo "Choose a dedicated output directory, not the filesystem or repository root." >&2
   exit 2
 fi
-VERSION="$(/usr/bin/sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/hermes-mobile-bridge/pyproject.toml" | /usr/bin/head -n 1)"
-[[ -n "$VERSION" ]] || { echo "Missing release version." >&2; exit 1; }
 ARCHIVE_PATH="$OUTPUT_DIR/Talaria-v$VERSION.xcarchive"
 DERIVED_DATA="$(/usr/bin/mktemp -d "/tmp/talaria-release-derived.XXXXXX")"
 IPA_STAGING=""
@@ -135,7 +140,16 @@ fi
 
 MARKETING_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
-[[ "$MARKETING_VERSION" == "$VERSION" && "$BUILD_NUMBER" == "1" ]] || { echo "App/bridge release version mismatch." >&2; exit 1; }
+[[ "$MARKETING_VERSION" == "$VERSION" && "$BUILD_NUMBER" == "2" ]] || { echo "App/bridge release version mismatch." >&2; exit 1; }
+
+EXTENSION_INFO="$APP_PATH/PlugIns/TalariaLiveActivity.appex/Info.plist"
+[[ -f "$EXTENSION_INFO" ]] || { echo "Missing Live Activity extension." >&2; exit 1; }
+EXTENSION_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$EXTENSION_INFO")"
+EXTENSION_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$EXTENSION_INFO")"
+EXTENSION_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$EXTENSION_INFO")"
+[[ "$EXTENSION_ID" == "$BUNDLE_ID.LiveActivity" && "$EXTENSION_VERSION" == "$VERSION" && "$EXTENSION_BUILD" == "$BUILD_NUMBER" ]] || {
+  echo "Live Activity identity/version mismatch." >&2; exit 1;
+}
 
 IPA_PATH=""
 if ((SIDESTORE_IPA)); then
@@ -178,8 +192,8 @@ import json, os, pathlib, hashlib, subprocess
 root = pathlib.Path(os.environ['TALARIA_RELEASE_ROOT'])
 tracked = subprocess.check_output(['git', '-C', str(root), 'ls-files', '-z']).decode().split('\0')
 inputs = {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in tracked
-          if name and (name.startswith(('Hermes/', 'Hermes.xcodeproj/', 'Config/')) or name == 'scripts/build-ios-release.sh')}
-metadata = {'product': 'Talaria', 'publisher': 'MAJOR//MINOR', 'version': '0.1.0', 'build': '1',
+          if name and (name.startswith(('Hermes/', 'Hermes.xcodeproj/', 'Config/', 'TalariaActivityShared/', 'TalariaLiveActivity/')) or name == 'scripts/build-ios-release.sh')}
+metadata = {'product': 'Talaria', 'publisher': 'MAJOR//MINOR', 'version': '0.2.0', 'build': '2',
             'bundle_identifier': 'xyz.majorminor.talaria', 'signing': 'unsigned',
             'physical_device_validation': 'PASS' if os.environ['TALARIA_DEVICE_VALIDATED'] == '1' else 'NOT_PERFORMED',
             'source_input_sha256': inputs}

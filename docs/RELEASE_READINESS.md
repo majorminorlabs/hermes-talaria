@@ -1,109 +1,105 @@
-# Talaria v0.1.0 public release readiness
+# Talaria 0.2.0 source update readiness
 
-Prepared 2026-10-05 from the separate sanitized public repository. Product Talaria;
-publisher MAJOR//MINOR; backend Hermes. Canonical unsigned IPA bundle ID
-`xyz.majorminor.talaria`, version 0.1.0/build 1. At that preparation snapshot, nothing had been pushed,
-tagged or published; see the later documentation status below.
+Prepared 2026-10-06 against public main `d24c1b4` and the existing v0.1.0 prerelease.
+App/extension: **0.2.0 / build 2**. Bridge: **0.2.0**. Public app identity remains
+`xyz.majorminor.talaria`, extension `.LiveActivity`. This is a source/documentation
+update; the old tag, release and downloads remain unchanged. No new IPA is published.
 
-## Current installation documentation (after publication)
+## Exact implementation delta
 
-Talaria supports two routes: [Xcode with your own Apple Developer Team](XCODE_INSTALL.md)
-and [official SideStore](SIDESTORE_USER_GUIDE.md). A free Personal Team can use
-Xcode; paid membership is optional for personal-device testing. Both routes use
-the shared [Mac bridge and pairing setup](INSTALL.md#mac-bridge-setup).
-Self-builders may change the bundle ID to a unique identifier under their own
-Team. The Keychain service follows the actual runtime ID; different IDs create
-separate app/container/preferences/Keychain identities.
+Nine development implementation commits after the release-preparation baseline
+were transferred as separate commits onto existing public history, with neutral
+attribution and private Live Activity evidence identifiers removed before committing.
+Original private development history is retained locally and is not pushed.
+Runtime/test source matches development HEAD except public identity adaptation,
+versioning and the three UI automation corrections described below.
 
-Later physical validation on 2026-10-05 installed the published IPA under its
-normal Team-suffixed public identity on one Apple Account. Pairing, bot inventory,
-streamed normal/bot chat, existing history, Home, Tasks, Settings, Photos/Files,
-force quit/relaunch, and ordinary Refresh with a matching renewed profile passed.
-It used an existing SideStore build carrying the legacy same-Team fix, so it does
-not establish a stock-build or second-account physical result. Refresh All was
-skipped in that session to preserve a separate rollback install. Detailed evidence
-boundaries are in the [SideStore guide](SIDESTORE_USER_GUIDE.md#identity-and-evidence).
-Direct Xcode installation was previously exercised with the development identity;
-a new self-builder Team/ID and paid-Team provisioning were not physically retested
-for this documentation update.
+- B1 independent Agent sessions; B2 durable device-owned Capture/media; command receipts.
+- Now / Threads / Agents, global deterministic Ask, Needs You, work/results/steps,
+  search/unread/pin/archive and Agent/source filters; secondary Studio/Board/Scheduled.
+- Durable local Capture with automatic sync; explicit-send Ask Outbox and receipt
+  checks for uncertainty. Voice Capture includes reviewed text and audio.
+- Agent operational/model controls with guarded default Revert and actual routine
+  interventions; model/reasoning/project settings retain session scope.
+- One aggregate Live Activity/shared extension package, excluding terminal/uncertain
+  runs; stale observations remain distinct from completion. No APNs delivery.
+- SSE health-probe resilience and expired-replay-cursor recovery, unified headers,
+  down-to-lock voice Ask with release sending, removal of duplicated work status.
 
-The published v0.1.0 IPA, checksums, tag and release remain unchanged. The original
-`BUILD_METADATA.json` still reports physical validation as NOT_PERFORMED **at
-packaging time**. Later suffixed validation does not replace that metadata or
-satisfy the packaging script's exact canonical-ID report gate automatically.
-The preparation record below retains its original evidence and publication limits.
+Phase 2 structured decisions/delegation, Agent pause/reasoning defaults, mid-thread
+model changes and TTS are not implemented. The design spec is a roadmap, not a
+feature inventory. See [changelog](../CHANGELOG.md) and [user guide](USING_TALARIA.md).
 
-## Original release-preparation record
+## Validation in this preparation
 
-## Identity and validation boundary
-
-The public ID is an intentional permanent release decision. The original private
-history was not merged. Changes are confined to the public checkout; the private
-development repository and valuable legacy physical installation remain untouched.
-No phone inventory, signing, deployment, migration or install command was used.
-
-Legacy development identifier: `com.dippo.hermes`. Historical functional acceptance
-and SideStore same-Team update/refresh evidence concern that existing installation.
-They do **not** establish physical signing or installation of the new public ID.
-The historical [physical report](../PHYSICAL_DEVICE_TEST_REPORT.md) is labeled legacy
-and cannot authorize new-ID packaging as physically validated.
-
-## Source and signing audit
-
-All app/test product IDs now use the public namespace; the Xcode project generates
-Info.plist, version 0.1.0/build 1 and Talaria display name. No custom entitlements,
-app groups, explicit Keychain access group, associated domains, iCloud, push or
-extensions are configured. Personal Team/signing material remains excluded.
-Public LaunchAgent template names/labels use `xyz.majorminor.talaria-mobile-*`.
-No installed service was changed by those source edits.
-
-`KeychainBridgeCredentialStore` defaults to `Bundle.main.bundleIdentifier`, with
-public-ID fallback only. Queries set generic-password class, service and host-ID
-account; no explicit access-group override. Signing determines the default group.
-Tokens remain `AfterFirstUnlockThisDeviceOnly`. New tests verify the runtime default
-and service isolation; they do not assert cross-Team or legacy/public migration.
-
-## Artifacts and checks
-
-Fresh output is in ignored `build/release/v0.1.0/`:
-
-| Artifact | Verification |
+| Check | Result |
 | --- | --- |
-| `Talaria-v0.1.0.xcarchive` | New unsigned generic-iOS Release compile/archive, public ID |
-| `Talaria-v0.1.0.ipa` | New public-ID Payload, matching archive bytes, no profile/signature |
-| `Talaria-v0.1.0.xcarchive.zip` | Normalized GitHub transport, matching archive bytes |
-| `hermes-mobile-bridge-v0.1.0.tar.gz` | New public service namespaces, coherent guides/patch, normalized metadata |
-| `SHA256SUMS.txt` | Final attachment hashes verified |
-| `BUILD_METADATA.json` | Public source-input hashes; physical validation explicitly NOT_PERFORMED |
+| Bridge pytest | 72 passed, 1 installed-Hermes opt-in skip |
+| Swift Testing | 90 passed, 3 explicit opt-in skips (93 discovered) |
+| Simulator UI | 22 practical tests passed, 18 physical/integration opt-in skips |
+| Service/deployment safety | 9 passed |
+| Release packaging/privacy regressions | 8 passed |
+| Python compile/static syntax and shell syntax | Passed |
+| Fresh unsigned device Release archive | Passed, embedded extension included |
+| App/extension identity, version/build and absent signing payload | Passed |
+| Artifact privacy/signing scan | No findings |
+| Internal Markdown file links | 149 file/anchor links checked, none missing |
+| Public source/history privacy scan | No actionable findings |
+| Gitleaks 8.30.1 | One reviewed synthetic credential fixture, no real secret finding |
 
-Run the commands in [release packaging](../RELEASE.md). Full current verification
-results and exact hashes are in [the handoff](PUBLIC_RELEASE_HANDOFF.md) and local
-release receipt. Build/test logs and raw xcresults remain ignored because they
-contain host paths and Simulator IDs. Public summary files omit those values.
+The full simulator run initially exposed three UI automation failures: the old
+Studio-header selector, a direct tap on a collapsed Now tab and Apply behind the
+model picker's bottom search accessory despite XCTest reporting it hittable. The
+selector/navigation/visibility handling was corrected, with original assertions
+retained. Host form and screen tour passed their focused rerun; model change,
+confirmation and Revert passed after the visibility correction. Product runtime
+was not changed to accommodate tests. Counts above are distinct tests, not added
+rerun totals. A parameterized Swift test generates an additional execution.
 
-## SideStore new users versus legacy
+The system Python was too old for the tar extraction test; the supported Python
+3.11 environment passed. No test was weakened or removed. Installed-Hermes/live
+production tests were not newly enabled; historical opt-in evidence is in the
+[Phase 1 implementation report](design/TALARIA_VNEXT_PHASE1_IMPLEMENTATION.md).
 
-Official SideStore's default Team-ID suffix is the source-derived expected public
-install and Refresh path. It does not need the legacy same-Team unsuffixed patch.
-The [user guide](SIDESTORE_USER_GUIDE.md) gives install → signing defaults → Tailscale
-→ bridge pairing → chat → Refresh → weekly procedure. It never asks new users to
-force the maintainer's exact signed identity or Personal Team.
+## Security, privacy and media
 
-Historical legacy evidence includes update-in-place/data and Keychain retention,
-two normal Refreshes and Refresh All with the minimal SideStore patch. Preserve
-that [investigation](SIDESTORE_INDEPENDENT_INVESTIGATION.md), [patch](sidestore/0001-restore-preferred-bundle-id-team-rule.patch)
-and [upstream draft](sidestore/UPSTREAM_PR.md). No upstream submission, fork or patched
-SideStore IPA is included in Talaria's release.
+Every transferred commit and the final public tree were reviewed. The personal
+signing suffix and device name in unpublished Live Activity notes were replaced
+before transfer. Private development author metadata and older Git objects were
+not imported. No public history was rewritten and no actual published secret was
+found. Gitleaks' fixture is a deterministic security-negative-test literal; ignored
+BUILD_METADATA hashes are hashes rather than credentials.
 
-New-ID physical install, second-account portal registration/Refresh, actual expiry,
-reboot/cellular/background refresh and legacy-to-public migration are not verified.
-These are disclosed prerelease limits; installing on the owner's phone is explicitly
-excluded. Source/build validation is not described as physical acceptance.
+Capture storage defaults outside Git, in the private service state and iPhone
+Application Support. Ignore rules additionally cover Capture/upload/Outbox/cache
+stores, databases, signing and scratch files. No real captures, audio, host configs,
+logs, credentials, device identifiers or signed artifacts enter the public index.
+See [privacy/security](PRIVACY_SECURITY.md). Arbitrary custom capture roots must
+also remain outside the checkout.
 
-## Publication
+Fresh Now and Agents screenshots use only synthetic simulator fixtures. Visual and
+PNG metadata/privacy review found no private values. Earlier v0.1.0 images remain as
+historical assets, without a current-interface claim. The website social card now
+labels 0.2.0 source. Public browser-served site assets passed private-path, tailnet,
+identifier and configured-credential comparisons.
 
-Use only the finalized sanitized public root and artifact set identified by the
-handoff/receipt. The existing private development repo remains unsafe to publish.
-Choose the MAJOR//MINOR GitHub account/org, approve neutral attribution and the
-prerelease, then explicitly authorize publication. No external mutation is performed
-by this preparation. MIT and dependency notices remain included.
+## Current installation documentation after publication
+
+Both Xcode and SideStore remain documented. Xcode installs current source; the
+available SideStore IPA is still v0.1.0. Set TALARIA_APP_BUNDLE_ID locally for a
+unique self-build identity; the extension derives its suffix and needs the same
+Team. Keep the installed ID and Team stable for updates. The IPA physical gate now
+requires both the public bundle ID and the exact version, so old acceptance cannot
+certify a new build. Free signing still requires periodic renewal.
+
+Historical phone acceptance and SideStore refresh evidence apply to their named
+builds, not 0.2.0. Stock SideStore and second-account signing remain physically
+unverified. Current physical microphone/recognition/audio, camera/picker permissions,
+input, accessibility, Wi-Fi/cellular reconnect, Live Activity presentations/background,
+installation/data retention and refresh checks remain pending. iOS 18 runtime is
+unavailable locally; its deployment target compiles but runtime behavior is unverified.
+
+No APNs/background-monitoring guarantee. The Mac must be awake, logged in and
+reachable. Capability-gating and the non-atomic review-note/transition contract remain.
+Formal 0.2.0 Release/IPA publication should follow current physical acceptance and a
+separate owner decision; it is intentionally outside this source push.

@@ -1,109 +1,105 @@
 # Use Talaria
 
-Complete [installation and pairing](INSTALL.md) first. The Mac must be awake,
-logged in and connected to your tailnet. On iPhone, keep Tailscale connected.
+[Install and pair](INSTALL.md) first. Keep Tailscale connected and the Mac awake,
+logged in and reachable. This guide describes current 0.2.0 source; the v0.1.0 IPA
+still has the earlier interface.
 
-## Confirm your connection
+## Now, Threads, Agents and Studio
 
-Open **Home**. The selected host should report both the bridge and Hermes as
-available. If you have multiple hosts, select the intended one before starting
-work. **More → Saved Hosts** manages saved connections. A pairing error requires a
-valid mobile bridge token; provider keys and Research Terminal tokens never
-belong in the phone's host form. See [troubleshooting](TROUBLESHOOTING.md).
+**Now** shows Needs You, Working, Done and Next Up. Needs You includes supported
+clarifications, task reviews, routine interventions and uncertain Outbox commands.
+Answer or use supported task transitions; snooze a request or defer it to your desk.
+Dangerous tool approval is a Mac handoff. Deadlines/defaults appear only when Hermes
+reports them. Review send-back notes and transitions are separate upstream operations.
 
-## Chat
+**Threads** contains conversation and observable work history. Search locally and,
+while connected, on Hermes. Filter by Agent/source, Active, Needs You or Unread;
+pin, mark read/unread and archive supported conversations. Open a thread to see
+streaming messages, collapsed steps, artifacts and results. Use follow-up, steer
+and confirmed Stop controls when supported. Unknown outcomes and disconnected
+last-known state are distinct; reconnect before deciding whether to repeat work.
 
-1. Open **Chat** and select an existing conversation, or use **+** for a new chat.
-2. Choose the host/profile and any model options the host offers.
-3. Type in the composer and tap Send. Read the streaming response and tool activity.
-4. During a run, use Stop to interrupt it or the steering control to provide
-   additional instructions. Dangerous tool approvals must be handled in Studio; Talaria cannot safely target them.
+**Agents** represents native Hermes bots/profiles. Open an Agent for current work,
+recent threads, configuration and model controls. **Ask** creates an independent
+thread for that Agent; the underlying canonical Bot Chat remains intact. Create,
+edit, duplicate and hide are capability-gated. Hide preserves history; unhide on
+Hermes Desktop. Model defaults affect future threads. Revert checks the server's
+current value first; it will not overwrite another device's change. Session settings
+are fixed at creation; reasoning is displayed only when the runtime reports it.
+Real routine pause/resume is available; pausing an Agent is not.
 
-Returning to an existing conversation preserves its identity. After a connection
-interruption, reopen it and let Talaria reconcile the run before submitting
-another request. An uncertain delivery is shown for review rather than silently
-resent. Offline views show last-known data; they cannot run Hermes offline.
+Tap the Talaria mark to open **Studio** for hosts, connection, settings, usage and
+other supported tools. **Studio → Hosts → Add Host** pairs with a private HTTPS
+URL and scoped bridge token, stored in Keychain. Provider keys stay on the Mac.
+Configured **Board** is reachable through Threads filters; Scheduled and Outbox
+are secondary destinations. The old Home/Chat/Bots/Tasks/More tabs are replaced.
 
-## Bots
+## Ask and routing
 
-Open **Bots** to see the real bots discovered from Hermes. Tap a bot for its
-configuration, then **Chat** to open its canonical shared conversation.
+Tap global **Ask** to start work from any main tab. **Auto** means Hermes, not an
+LLM router. Explicit Agent names/aliases resolve deterministically; ambiguous
+matches require your choice. Inspect the destination before sending. Supported
+provider/model, reasoning and project overrides apply only when creating the thread.
+Send returns to your prior screen with an **Open** toast.
 
-To create one, tap **+**, enter Name and description, optionally choose a host-
-provided Provider/Model, add SOUL instructions and select Skills. Toolsets and
-MCP server selections appear only when the host supports them. Tap **Create**.
-Leaving the provider on **Hermes default** uses the default profile's model.
-The new bot appears after Hermes confirms and Talaria reloads the inventory.
+When offline, Ask is durable in **Outbox** and requires **Send now** after reconnect.
+An interrupted delivery becomes uncertain: use **Check** to inspect the bridge
+receipt. A confirmed command is not repeated. Only a rejected/not-received outcome
+makes explicit sending available again; unresolved outcomes need checking on the Mac.
 
-To edit, open the bot → **Edit**, change supported fields and tap **Save**.
-Some model changes require confirmation. Verify the reloaded detail; changes
-apply to the next run. **Duplicate** creates a separate identity. **Hide** asks
-for confirmation and removes the bot from the visible list while preserving its
-canonical chat/history in Hermes. Unhide from Hermes Desktop. Talaria does not
-provide hard deletion. Missing controls mean the host does not offer that capability.
+## Capture and attachments
 
-## Files, photos and camera
+**Capture** stores a note, idea, task label, link, photo, file or voice record.
+Its kind does not execute a task. Text is preserved exactly; context and attachments
+are separate metadata. Plain links are not fetched. Files, Photo Library and Camera
+use native pickers; camera and permissions need a physical device.
 
-In a writable conversation, tap the attachment button beside the composer:
+**Saved on iPhone** means local persistence. Captures survive relaunch and sync on
+reconnect; **Saved to Hermes** requires the bridge's stable-ID acknowledgement.
+Older bridges without Capture capability retain them locally. Use Outbox to review
+pending captures and errors. Update the bridge from current source for B1/B2 support.
 
-- **Files:** choose a document from the native Files picker.
-- **Photo Library:** choose one or more images.
-- **Camera:** grant access, take a photo, review it and select **Use Photo**.
+Capture stores dated UTF-8 Markdown, metadata sidecars and media in the bridge's
+private inbox, separate from Kanban and Obsidian. Text is limited to 200 KB;
+attachments to four at 10 MiB each; default media quota is 256 MiB per device.
+Conversation attachments have the same four-file/10 MiB limits. Supported images,
+PDF and text/code files get previews where the host supports them; PDF previews
+need host Poppler. Review attachment previews before sending.
 
-Review the attachment chips/previews; remove an unwanted item before sending.
-Add a short question describing what Hermes should do with the attachment,
-then Send. Uploads are tied to that conversation. Supported types include
-images, PDF, plain text/Markdown, JSON, CSV and common code files, with a
-**10 MiB limit per file and up to four attachments per message**. Permission
-denials show guidance; enable access in iOS Settings if you choose. Camera
-capture requires a physical camera. See [troubleshooting](TROUBLESHOOTING.md).
+## Voice
 
-## Dictation
+Hold global **Ask** to speak. Release sends the recognized text to the displayed
+destination; slide **down** to lock, **left** to cancel. A locked hold uses **Send**
+when ready. Recording has a 60-second fuse. A short/empty recording is rejected.
+Editable Ask dictation can show a 1.5-second review before automatic sending unless
+**Review voice before sending** is enabled. Held Ask uses send-on-release behavior.
 
-Tap the microphone in the composer. Grant microphone and speech recognition
-access when prompted, then speak. Partial transcription appears in the normal
-text composer. Tap Stop when finished; edit the final words and tap Send.
-Cancel discards the current recognition session. This is speech-to-text, not a
-voice call: Talaria does not upload microphone audio to the bridge. It prefers
-on-device recognition when supported; Apple's recognizer may use its network
-service for other device/language combinations.
+Voice Capture and clarification answers require explicit confirmation. Capture
+sends the reviewed transcript and mono M4A recording; ordinary dictation and voice
+Ask send text without microphone audio. Speech recognition prefers on-device
+processing; Apple's network recognition may be used for unsupported devices/languages.
+No voice call, spoken response or TTS is provided.
 
-## Tasks and routines
+## Live Activity and reconnect
 
-Open **Tasks** for the host's jobs, routines and Kanban board. Use the controls
-Hermes exposes for that item. Destructive or unavailable operations show
-confirmation or an explanation. Refresh after a change to verify the result.
-Boards must be explicitly authorized by the Studio installer.
+One aggregate Activity shows observed running, needs-input and blocked work on
+Lock Screen/Dynamic Island. Completed and uncertain runs are excluded from the
+active count. Rows can open Threads; there are no remote approve/Stop actions.
+Production snapshots become stale after 60 seconds and do not imply completion
+on disconnect. App suspension may stop updates; there is no APNs/background delivery.
+On reopen Talaria reconciles canonical snapshots and replays retained events.
 
-## Research Terminal
+## Optional research, signing and updates
 
-Research Terminal is optional and configured on the Mac separately. Select
-**Bots → Research Orchestrator → Chat** and ask a read-only question such as
-“Search existing Research Terminal records for retrieval; do not start a new
-research run.” The host needs the installed `research-terminal` skill and its
-owner-only credential file. No Research Terminal credential is entered on iPhone.
-See [Research Terminal setup](RESEARCH_TERMINAL_SETUP.md).
+Ask the host's Research Orchestrator a read-only retrieval question when its
+Research Terminal skill/credentials are configured. Credentials stay on the Mac;
+see [Research Terminal setup](RESEARCH_TERMINAL_SETUP.md).
 
-## Updates and background behavior
+Update the bridge separately with [Studio setup](STUDIO_SETUP.md). Xcode builds
+keep the installed ID and Team; free signing needs rebuild/reinstall before expiry.
+SideStore: Tailscale off → LocalDevVPN on → Refresh → verify the renewed signing
+period → LocalDevVPN off → Tailscale on. The existing published IPA remains 0.1.0;
+current source features require a current Xcode build. Do not uninstall for routine
+updates. A changed ID creates a separate container and Keychain identity.
 
-Use the update/signing method you installed with:
-
-- **Xcode:** retain your installed bundle ID and Team, update the source checkout,
-  then build/run again on the same iPhone. Free Personal Team signing needs a
-  rebuild/reinstall before seven-day expiry; paid signing follows the actual
-  development profile's expiration. See [Xcode installation](XCODE_INSTALL.md).
-- **SideStore:** with free-account signing, refresh before expiry: Tailscale off →
-  LocalDevVPN on (Wi-Fi) → **My Apps → Refresh All** → verify the renewed signing
-  period → LocalDevVPN off → Tailscale on → confirm a fresh Talaria reply. To update
-  app code, import the new IPA with the same identity and Team. See the
-  [SideStore user guide](SIDESTORE_USER_GUIDE.md) for evidence and limits.
-
-LocalDevVPN serves SideStore installation/refresh only; normal Talaria use needs
-Tailscale. Do not delete an app for a routine update. Changing its bundle ID creates
-a separate app whose local preferences/container and Keychain state do not
-transfer automatically; a changed signing Team may also require re-pairing.
-
-There is no APNs push delivery. While suspended, iOS may pause the connection;
-opening Talaria replays retained events and reconciles the conversation. Avoid
-expecting continuous background monitoring. Personal/free-account signing
-expires after seven days unless refreshed.
+See [privacy](PRIVACY_SECURITY.md) and [validation boundaries](RELEASE_READINESS.md).

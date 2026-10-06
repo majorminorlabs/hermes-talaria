@@ -90,8 +90,11 @@ final class InteractionTests: XCTestCase {
         XCTAssertTrue(modelRow.waitForExistence(timeout:5)); modelRow.tap()
         let local = app.buttons.matching(NSPredicate(format:"label CONTAINS 'Qwen3 Coder 30B' ")).firstMatch
         XCTAssertTrue(local.waitForExistence(timeout:5)); local.tap()
-        for _ in 0..<6 where !app.buttons["Apply"].exists { app.swipeUp() }
-        XCTAssertTrue(app.buttons["Apply"].waitForExistence(timeout:5)); app.buttons["Apply"].tap(); app.buttons["risk-confirm"].tap()
+        // iOS can report the row hittable while it sits behind the bottom
+        // search accessory. Bring it fully inside the visible list before tapping.
+        for _ in 0..<6 where !app.buttons["Apply"].exists || app.buttons["Apply"].frame.maxY > app.frame.maxY - 120 { app.swipeUp() }
+        XCTAssertTrue(app.buttons["Apply"].waitForExistence(timeout:5)); app.buttons["Apply"].tap()
+        XCTAssertTrue(app.buttons["risk-confirm"].waitForExistence(timeout: 5)); app.buttons["risk-confirm"].tap()
         let revert = app.buttons["Revert"]
         XCTAssertTrue(revert.waitForExistence(timeout:10)); revert.tap()
         XCTAssertTrue(app.staticTexts["Default restored"].waitForExistence(timeout:5))

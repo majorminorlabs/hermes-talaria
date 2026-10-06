@@ -15,7 +15,7 @@ final class FormInputTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchArguments = ["-app.backendSimulation", "NO"]; app.launch()
         XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout: 15))
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Studio connection' ")).firstMatch.tap()
+        app.buttons["talaria-settings"].tap()
         let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Saved Hosts' ")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5)); saved.tap(); app.buttons["Add Host"].tap()
         let name = app.textFields["host-name"], address = app.textFields["host-address"], port = app.textFields["host-port"]

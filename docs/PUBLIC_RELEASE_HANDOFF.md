@@ -1,3 +1,7 @@
+> Historical v0.1.0 publication record. The existing public repository is now
+> majorminorlabs/hermes-talaria; do not run old repository-creation recipes again.
+> Current source-update workflow and acceptance are in [release readiness](RELEASE_READINESS.md).
+
 # Talaria v0.1.0 public release handoff
 
 Product: **Talaria**. Publisher/project: **MAJOR//MINOR**. Backend: **Hermes**.

@@ -1,3 +1,7 @@
+> Historical implementation/design reference. For current 0.2.0 navigation,
+> Capture/voice semantics and capability boundaries, see [Use Talaria](docs/USING_TALARIA.md)
+> and [current release notes](CHANGELOG.md). Agents are underlying Hermes bots/profiles.
+
 # Hermes iPhone ↔ Studio architecture
 
 Audit baseline: installed source `~/.hermes/hermes-agent` at `2a4c9afd7bd7b56d3e1f95524ca8956092f2904c`, environment date 2026-10-01. See [MOBILE_CAPABILITY_MAP.md](MOBILE_CAPABILITY_MAP.md) for source anchors, feature-by-feature evidence, wire shapes and validation limits.

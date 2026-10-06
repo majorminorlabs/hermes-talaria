@@ -1,3 +1,20 @@
+# Current 0.2.0 troubleshooting additions
+
+- **Captures remain on iPhone:** update the bridge from current source and verify
+  Capture capability, connectivity, private storage permissions and media quota.
+  Saved on iPhone is not a remote acknowledgement. Review Outbox errors.
+- **Ask outcome uncertain:** use Outbox → Check; do not resend before the receipt
+  resolves. Offline queued Asks always require Send now.
+- **Live Activity is stale:** updates depend on the app running; reopen Talaria to
+  reconcile. There is no APNs background delivery or remote approve/Stop action.
+- **Model selection/signing:** new-thread settings are fixed at creation. Set
+  TALARIA_APP_BUNDLE_ID locally; the extension derives its .LiveActivity ID and
+  needs the same Team. Do not override both targets to an identical bundle ID.
+
+Common connection/signing advice and historical v0.1.0 UI paths follow. Current
+navigation is Now / Threads / Agents, with hosts/settings in Studio. See the
+[current user guide](USING_TALARIA.md).
+
 # Troubleshooting Talaria
 
 - **Cannot reach the Mac:** keep the host awake/logged in, connect Tailscale on

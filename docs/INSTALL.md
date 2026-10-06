@@ -24,7 +24,7 @@ Hermes on Mac → hermes-mobile-bridge → private Tailscale HTTPS → Talaria o
 - An iPhone running iOS 18 or newer, and an installation route: Xcode with a signed-in Apple ID for development, or SideStore for repeatable personal-device installs.
 
 Talaria is open source and self-hosted. The canonical project/release bundle ID
-is `xyz.majorminor.talaria`, version `0.1.0`. Sign with your own Apple Account/Team;
+is `xyz.majorminor.talaria`, current source version `0.2.0`. Sign with your own Apple Account/Team;
 no publisher certificate or provisioning material is provided.
 
 ### Option A: Xcode / Apple Developer
@@ -46,6 +46,9 @@ such as `xyz.majorminor.talaria.<YOUR TEAM ID>` is expected. Follow the
 **LocalDevVPN is only for SideStore installation/refresh. Tailscale is for normal
 Talaria ↔ Hermes bridge connectivity.** Turn LocalDevVPN off and Tailscale back
 on before using Talaria. Xcode installs do not require LocalDevVPN.
+
+The published IPA remains **0.1.0** with the earlier interface. Current **0.2.0**
+features require building source with Xcode; no new IPA is published in this update.
 
 ## Mac bridge setup
 
@@ -101,14 +104,14 @@ Copy it directly into Talaria; do not put it in shell history, a file in the che
 
 1. Install and sign in to Tailscale on the iPhone. Confirm the Mac and phone are members of the same tailnet. Disable LocalDevVPN if you used SideStore.
 2. Install Talaria using either [Xcode](XCODE_INSTALL.md) or [SideStore](SIDESTORE_USER_GUIDE.md).
-3. Open Talaria → More → Saved Hosts → Add Host.
+3. Open Talaria → Studio → Hosts → Add Host.
 4. Enter a name such as `Mac Studio`, the HTTPS bridge URL, and the one-time displayed mobile token. Saving checks authentication and stores the token in the iPhone Keychain.
-5. Open Home and confirm that both the bridge and Hermes report healthy.
+5. Open Studio and confirm bridge/Hermes connectivity, then check Now.
 
-6. Open Bots and an existing bot chat, then send a short request and verify a
+6. Open Agents and an existing thread, then send a short request and verify a
    streamed response. Existing Hermes conversations/history should be accessible;
    local preferences and credentials from a different app identity are not imported.
-7. Open Tasks, then force quit/relaunch Talaria and confirm reconnect. For SideStore,
+7. Check Now and the configured Board, then force quit/relaunch Talaria and confirm reconnect. For SideStore,
    also complete the guide's ordinary Refresh verification before relying on it.
 
 Use the full HTTPS URL shown by `configure-tailscale.sh`. Do not enter the Studio's loopback bridge URL, a raw HTTP URL, an SSH address, or a Hermes provider key.
@@ -142,4 +145,4 @@ For full Studio service, backup, and network details, read [Studio setup](STUDIO
 
 The bridge and Hermes LaunchAgents start when the owning user logs in and are kept alive after crashes. They stop at logout; they do not run before login as root services. The Mac must be powered, awake, logged into the configured account, and connected to Tailscale for iPhone access. This is an intentional per-user service design so the processes use the normal Hermes configuration without system-wide privileges.
 
-Pairing is manual host URL plus token. There is no QR enrollment endpoint in bridge v0.1.0. Physical iPhone behavior depends on the actual tailnet policy, Apple signing, and device network; the repository's local Simulator results do not establish those outcomes.
+Pairing is manual host URL plus token. There is no QR enrollment endpoint in the current bridge. Physical iPhone behavior depends on the actual tailnet policy, Apple signing, and device network; the repository's local Simulator results do not establish those outcomes.

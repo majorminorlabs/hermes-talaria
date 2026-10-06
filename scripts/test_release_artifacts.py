@@ -43,6 +43,15 @@ class ReleaseTests(unittest.TestCase):
                     self.assertTrue((document.parent/linked).is_file(), f'{document.relative_to(package_root)}: {target}')
             self.assertTrue((package_root/'docs/sidestore/0001-restore-preferred-bundle-id-team-rule.patch').is_file())
 
+    def test_old_version_physical_pass_cannot_authorize_current_ipa(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = pathlib.Path(tmp)/'physical.md'
+            report.write_text('physical_device_validation: PASS\nvalidation_bundle_identifier: xyz.majorminor.talaria\nvalidation_version: 0.1.0\n')
+            result = subprocess.run([str(ROOT/'scripts/build-ios-release.sh'), '--sidestore-ipa',
+                                     '--physical-validation-report', str(report)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('validation_version: 0.2.0', result.stderr)
+
     def test_detects_payload_privacy_and_signing(self):
         with tempfile.TemporaryDirectory() as tmp:
             artifact=pathlib.Path(tmp)/'example.ipa'

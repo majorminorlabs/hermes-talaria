@@ -12,7 +12,7 @@ pairing token, private configuration or Python virtual environment.
 4. Configure Tailscale HTTPS using `./scripts/configure-tailscale.sh`.
 5. Check `./scripts/status-bridge.sh` and create a mobile credential using
    `./scripts/pairing-token.sh --name iPhone`.
-6. Install Talaria separately and pair it through **More → Hosts → Add Host**.
+6. Install Talaria separately and pair it through **Studio → Hosts → Add Host**.
 
 Read [full installation](INSTALL.md), [Studio setup](STUDIO_SETUP.md),
 [using Talaria](USING_TALARIA.md), [SideStore](SIDESTORE.md) and

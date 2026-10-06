@@ -79,7 +79,7 @@ The helper records its generated token in a private, mode-0600 `mobile-pairing.j
 ./scripts/pairing-token.sh --show
 ```
 
-Use **More → Hosts → Add Host** in Talaria. Enter the stable HTTPS URL and token. Talaria authenticates, then stores the bearer in the iOS Keychain. Do not send credentials in email/chat, paste them into source/config, or capture them in screenshots. Hermes provider keys and the upstream desktop token remain Studio-side. The pairing helper file is a protected plaintext token copy; after Talaria has saved its Keychain credential, remove the transfer copy with `./scripts/pairing-token.sh --forget-transfer`. Revoke the device token if the file is exposed.
+Use **Studio → Hosts → Add Host** in Talaria. Enter the stable HTTPS URL and token. Talaria authenticates, then stores the bearer in the iOS Keychain. Do not send credentials in email/chat, paste them into source/config, or capture them in screenshots. Hermes provider keys and the upstream desktop token remain Studio-side. The pairing helper file is a protected plaintext token copy; after Talaria has saved its Keychain credential, remove the transfer copy with `./scripts/pairing-token.sh --forget-transfer`. Revoke the device token if the file is exposed.
 
 List or revoke a device as needed:
 

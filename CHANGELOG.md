@@ -5,7 +5,58 @@ supports [Xcode](docs/XCODE_INSTALL.md) and [SideStore](docs/SIDESTORE_USER_GUID
 later public-ID phone validation is recorded in [release readiness](docs/RELEASE_READINESS.md).
 The published v0.1.0 release artifacts remain unchanged.
 
-## 0.1.0 — prepared prerelease (2026-10-05)
+## 0.2.0 — source update (2026-10-06)
+
+This entry describes current source, not a new downloadable IPA or GitHub Release.
+The existing v0.1.0 tag and artifacts remain unchanged. App/bridge version is 0.2.0;
+app and Live Activity build number is 2, with the public bundle identity preserved.
+
+### Work from the phone
+
+Now / Threads / Agents replace the old primary tabs. Now groups Needs You, Working,
+Done and upcoming routines; Threads adds search, unread/pin/archive and Agent/source
+filters. Thread steps, artifacts, results and supported delegate handoff markers
+replace the separate Run Detail shell. Global Ask previews deterministic routing:
+Auto selects Hermes; explicit names/aliases select an Agent, with ambiguity resolved
+by the user. Independent Agent threads preserve canonical Bot Chats.
+
+### Durable input and control
+
+Capture stores verbatim text, context and media in a local relaunch-safe queue and
+syncs to a dedicated private Mac inbox. Voice Capture includes its confirmed
+transcript and M4A audio. Offline Asks always require Send now; uncertain commands
+use receipt checks without automatic replay. Held voice Ask sends on release,
+slides down to lock and left to cancel; Capture/clarifications remain explicit.
+Native input regressions cover typed/pasted Agent and host fields.
+
+Agent detail shows real work/recent threads and supported model-default change/
+Revert controls. New-thread model/provider, reasoning and project overrides retain
+Hermes session scope. Needs You exposes supported clarification deadlines, task
+review/send-back and routine interventions, with snooze/desk handoff.
+
+### Bridge, recovery and Live Activity
+
+B1 creates independent Agent sessions. B2 adds device-owned, stable-ID Capture and
+media storage with durability/ownership/type/quota checks. Read-only command receipts
+resolve uncertain Outbox state. Native Kanban assignments and review notes map to
+real backend operations. SSE survives transient health failures and recovers expired
+replay cursors through canonical snapshots.
+
+One aggregate Live Activity prioritizes blocked/needs-input/running work, excludes
+completed/uncertain runs and opens Threads. App/extension share a local Swift package.
+Headers are unified and duplicate thread work-status panels removed.
+
+### Compatibility and limits
+
+Update the bridge from current source; older hosts retain unsupported captures
+locally. iOS 18 deployment target and both installation paths remain. The Live
+Activity extension derives its ID from TALARIA_APP_BUNDLE_ID; select your own Team
+for both targets. No APNs/background guarantee, mid-thread model switching, Agent
+pause/reasoning defaults, structured decisions, tracked delegation or TTS. Review
+notes plus transitions are non-atomic. New physical voice/Live Activity and iOS 18
+runtime validation remain pending. Historical physical reports do not certify 0.2.0.
+
+## 0.1.0 — published prerelease (2026-10-05)
 
 ### Public identity
 
@@ -67,5 +118,4 @@ The patch is for existing unsuffixed installations; ordinary new users keep
 official SideStore and the default suffix. New-ID physical signing/Refresh remains
 unverified. See [installation](docs/SIDESTORE.md).
 
-Source is MIT-licensed with third-party notices. This is release preparation,
-not a published GitHub release or tag.
+Source is MIT-licensed with third-party notices. The v0.1.0 prerelease was published on 2026-10-05; its artifacts remain unchanged.

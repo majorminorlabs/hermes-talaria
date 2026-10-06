@@ -1,3 +1,17 @@
+# Current UI architecture
+
+Current 0.2.0 uses Now / Threads / Agents, global Ask and secondary Studio. Work and
+Needs You are projections of actual conversations/runs, reviews and interventions.
+Thread steps/results replace Run Detail. Durable Outbox separates explicit-send
+Asks from automatically synced Captures. Agent settings retain Hermes session scope.
+One app-wide event subscription reconciles canonical snapshots and replay cursors;
+Live Activity projects observed active work into the shared app/extension package.
+
+See [implementation](docs/design/TALARIA_VNEXT_PHASE1_IMPLEMENTATION.md),
+[Live Activity](docs/design/TALARIA_LIVE_ACTIVITY.md) and [user guide](docs/USING_TALARIA.md).
+The earlier architectural description follows as historical context; old navigation
+and proposed controls in it are not the current product contract.
+
 # Talaria — UI Architecture
 
 Native SwiftUI control surface for Hermes Agent running on a Mac Studio.

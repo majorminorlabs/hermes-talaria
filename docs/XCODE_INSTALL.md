@@ -49,9 +49,9 @@ HermesTests or HermesUITests.
 3. Choose your own Apple Developer Team (or **Personal Team**).
 4. Check the **Bundle Identifier**. The canonical project/release ID is
    `xyz.majorminor.talaria`, identifying the MAJOR//MINOR release. If it is not
-   available to your Team, replace it with a unique ID such as
-   `com.example.talaria`, preferably based on a domain you control. Apply your
-   choice to the build configurations you will use.
+   available to your Team, set `TALARIA_APP_BUNDLE_ID` to a unique ID such as
+   `com.example.talaria`, preferably based on a domain you control. Use the ignored local xcconfig so app and extension share this base ID.
+   The extension derives `<app ID>.LiveActivity`; choose your Team for both targets.
 5. Allow Xcode to create the development certificate and profile for your Team
    and connected device. Resolve signing errors before building.
 
@@ -70,8 +70,9 @@ you are deliberately changing identities.
 Keep personal signing changes out of commits. The shared project optionally
 loads the ignored root `Signing.local.xcconfig`: copy
 `Config/Signing.example.xcconfig` there to store your `DEVELOPMENT_TEAM` locally.
-Changing the bundle identifier in Xcode writes the project file; keep that edit
-local and review your diff before committing. Do not copy MAJOR//MINOR Team IDs,
+Set `TALARIA_APP_BUNDLE_ID = com.example.talaria` in that local file. Do not
+globally override `PRODUCT_BUNDLE_IDENTIFIER`, which would give both targets the
+same ID. Review any signing changes Xcode writes before committing. Do not copy MAJOR//MINOR Team IDs,
 certificates, credentials or provisioning material.
 
 ## Install on the physical iPhone
@@ -95,8 +96,8 @@ SideStore installs use Hermes → hermes-mobile-bridge → private Tailscale HTT
 → Talaria. Keep Tailscale connected on the phone for normal use; LocalDevVPN is
 only needed by the alternative SideStore route.
 
-Verify Home, existing Bots/history, a fresh streamed normal chat and bot chat,
-Tasks, and reconnect after force quit/relaunch. Never put Hermes/provider
+Verify Now, Agents/history, a fresh streamed Ask and independent Agent thread,
+Capture, and reconnect after force quit/relaunch. Never put Hermes/provider
 credentials into Talaria; use the bridge's scoped mobile pairing token.
 
 ## Update or rebuild later

@@ -1,3 +1,7 @@
+> Historical implementation/design reference. For current 0.2.0 navigation,
+> Capture/voice semantics and capability boundaries, see [Use Talaria](docs/USING_TALARIA.md)
+> and [current release notes](CHANGELOG.md). Agents are underlying Hermes bots/profiles.
+
 # Hermes mobile capability map
 
 Audit date: 2026-10-01 (environment date). This is a source audit and contract recommendation, not an implementation or deployment certification.

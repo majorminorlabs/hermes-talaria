@@ -1,3 +1,7 @@
+> Historical implementation/design reference. For current 0.2.0 navigation,
+> Capture/voice semantics and capability boundaries, see [Use Talaria](docs/USING_TALARIA.md)
+> and [current release notes](CHANGELOG.md). Agents are underlying Hermes bots/profiles.
+
 # Hermes Bot management from iPhone
 
 Bot Mode uses Hermes profiles as its source of truth. The bridge calls the same

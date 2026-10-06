@@ -1,3 +1,7 @@
+> Historical implementation/design reference. For current 0.2.0 navigation,
+> Capture/voice semantics and capability boundaries, see [Use Talaria](docs/USING_TALARIA.md)
+> and [current release notes](CHANGELOG.md). Agents are underlying Hermes bots/profiles.
+
 # Attachments and dictation
 
 The existing conversation composer now offers Files, Photo Library and Camera
