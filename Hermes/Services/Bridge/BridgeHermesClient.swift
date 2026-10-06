@@ -681,8 +681,13 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
                     if frame.event == "stream.checkpoint" {
                         if let cursor = json["cursor"].string, cursor != committedCursor?.value { await deliver(.checkpoint,cursor:cursor) }
                         guard !Task.isCancelled, generation == subscription else { return }
-                        // Source health can change even while no run is generating events.
-                        _ = try await status(hostID:hostID)
+                        // A checkpoint proves this stream is alive. An auxiliary
+                        // health probe may fail on cellular without invalidating it;
+                        // retry on the next checkpoint instead of reconnecting SSE.
+                        // Authentication/protocol failures still take the normal path.
+                        do { _ = try await status(hostID:hostID) }
+                        catch HermesError.timeout { }
+                        catch HermesError.bridgeUnreachable { }
                         continue
                     }
                     guard let cursor = json["cursor"].string, let seq = json["seq"].int else { throw HermesError.rejected("Malformed bridge event") }

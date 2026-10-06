@@ -742,6 +742,78 @@ struct BridgeIntegrationTests {
         #expect(frames[1].data == "{\"ok\":\ntrue}")
     }
 
+    @Test(arguments: [URLError.Code.timedOut, .networkConnectionLost])
+    func checkpointProbeFailureKeepsStreamAndRetriesHealth(failure: URLError.Code) async throws {
+        let hostID = "studio-\(UUID().uuidString)"
+        let domain = uniqueBridgeTestHost()
+        let recorder = BridgeRequestRecorder()
+        let event = bridgeEvent(type: "assistant.completed", sequence: 1, text: "Still streaming")
+        BridgeStubURLProtocol.register(host: domain) { request in
+            recorder.append(request)
+            if request.url?.path.hasSuffix("/capabilities") == true {
+                let probes = recorder.requests.filter { $0.url?.path.hasSuffix("/capabilities") == true }.count
+                if probes == 3 { return BridgeStubResponse(failure: failure) }
+                // A confirmed unhealthy backend must still be reflected, followed by recovery.
+                return capabilitiesResponse(connected: probes != 4)
+            }
+            if request.url?.path.hasSuffix("/runs/run-one") == true {
+                return BridgeStubResponse(body: encodedBridgeJSON(runSnapshot(text: "", cursor: "test-epoch:0")))
+            }
+            let checkpoint = "event: stream.checkpoint\ndata: {\"cursor\":\"test-epoch:0\"}\n\n"
+            return BridgeStubResponse(contentType: "text/event-stream", body: checkpoint + checkpoint + checkpoint + sseFrame(event))
+        }
+        defer { BridgeStubURLProtocol.unregister(host: domain) }
+        let client = BridgeHermesClient(credentials: BridgeTestCredentialStore(hostID: hostID, token: "token"), session: makeBridgeTestSession(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await client.connect(to: bridgeHost(id: hostID, domain: domain))
+        let stream = client.subscribe(after: EventCursor(value: "test-epoch:0"))
+        var states: [ConnectionState] = []
+        var received = false
+        for await envelope in stream {
+            if case .hostStatus(let status) = envelope.event { states.append(status.connection) }
+            if envelope.cursor.value == "test-epoch:1" {
+                received = true
+                #expect(assistantMessage(in: envelope.event)?.plainText == "Still streaming")
+                await client.acknowledge(envelope.cursor)
+                break
+            }
+            #expect(states.count < 10)
+            if states.count >= 10 { break }
+        }
+        await client.disconnect(hostID: hostID)
+        #expect(received)
+        #expect(states == [.connected, .hermesOffline, .connected])
+        #expect(recorder.requests.filter { $0.url?.path.hasSuffix("/events/stream") == true }.count == 1)
+        #expect(recorder.requests.filter { $0.url?.path.hasSuffix("/capabilities") == true }.count == 5)
+    }
+
+    @Test func checkpointProbeAuthenticationFailureStillRequiresPairing() async throws {
+        let hostID = "studio-\(UUID().uuidString)"
+        let domain = uniqueBridgeTestHost()
+        let recorder = BridgeRequestRecorder()
+        BridgeStubURLProtocol.register(host: domain) { request in
+            recorder.append(request)
+            if request.url?.path.hasSuffix("/capabilities") == true {
+                let probes = recorder.requests.filter { $0.url?.path.hasSuffix("/capabilities") == true }.count
+                return probes <= 2 ? capabilitiesResponse() : BridgeStubResponse(status: 401)
+            }
+            return BridgeStubResponse(contentType: "text/event-stream", body: "event: stream.checkpoint\ndata: {\"cursor\":\"test-epoch:0\"}\n\n")
+        }
+        defer { BridgeStubURLProtocol.unregister(host: domain) }
+        let client = BridgeHermesClient(credentials: BridgeTestCredentialStore(hostID: hostID, token: "token"), session: makeBridgeTestSession(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await client.connect(to: bridgeHost(id: hostID, domain: domain))
+        let stream = client.subscribe(after: EventCursor(value: "test-epoch:0"))
+        var pairingRequired = false
+        for await envelope in stream {
+            if case .hostStatus(let status) = envelope.event, status.connection == .authenticationRequired {
+                pairingRequired = true
+                break
+            }
+        }
+        await client.disconnect(hostID: hostID)
+        #expect(pairingRequired)
+        #expect(recorder.requests.filter { $0.url?.path.hasSuffix("/events/stream") == true }.count == 1)
+    }
+
     @Test func reconnectReplaysAfterCommittedCursorAndDeduplicatesSequence() async throws {
         let hostID = "studio-\(UUID().uuidString)"
         let domain = uniqueBridgeTestHost()
