@@ -77,6 +77,7 @@ final class AppRouter {
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
         switch url.host {
+        case "threads": selectedTab = .threads; threadsPath = []
         case "now": selectedTab = .now; nowPath = []
         case "thread":
             if let id = parts.first { selectedTab = .now; nowPath = [.thread(id)]; if parts.last == "steps" { stepsRunID = value("run") } }

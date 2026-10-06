@@ -60,6 +60,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B20000000000000000000012,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,6 +77,7 @@
 		A10000000000000000000006 = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000003,
 				A10000000000000000000004 /* Hermes */,
 				A10000000000000000000005 /* HermesTests */,
 				A10000000000000000000062 /* HermesUITests */,
@@ -87,6 +89,7 @@
 		A10000000000000000000007 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000001,
 				A10000000000000000000002 /* Hermes.app */,
 				A10000000000000000000003 /* HermesTests.xctest */,
 				A10000000000000000000061 /* HermesUITests.xctest */,
@@ -127,16 +130,19 @@
 				A10000000000000000000012 /* Sources */,
 				A10000000000000000000011 /* Frameworks */,
 				A10000000000000000000013 /* Resources */,
+				B2000000000000000000000D,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B20000000000000000000014,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000004 /* Hermes */,
 			);
 			name = Hermes;
 			packageProductDependencies = (
+				B2000000000000000000000F,
 			);
 			productName = Hermes;
 			productReference = A10000000000000000000002 /* Hermes.app */;
@@ -201,7 +207,9 @@
 			productRefGroup = A10000000000000000000007 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (B2000000000000000000000E,);
 			targets = (
+				B20000000000000000000008,
 				A10000000000000000000010 /* Hermes */,
 				A10000000000000000000020 /* HermesTests */,
 				A10000000000000000000060 /* HermesUITests */,
@@ -391,7 +399,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.majorminor.talaria;
+				TALARIA_APP_BUNDLE_ID = xyz.majorminor.talaria;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TALARIA_APP_BUNDLE_ID)";
+				INFOPLIST_FILE = Config/TalariaInfo.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -429,7 +439,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.majorminor.talaria;
+				TALARIA_APP_BUNDLE_ID = xyz.majorminor.talaria;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TALARIA_APP_BUNDLE_ID)";
+				INFOPLIST_FILE = Config/TalariaInfo.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -526,6 +538,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+		B20000000000000000000001 = { path = "TalariaLiveActivity.appex"; isa = "PBXFileReference"; explicitFileType = "wrapper.app-extension"; sourceTree = "BUILT_PRODUCTS_DIR"; };
+		B20000000000000000000002 = { path = "HermesLiveActivity.swift"; isa = "PBXFileReference"; lastKnownFileType = "sourcecode.swift"; sourceTree = "<group>"; };
+		B20000000000000000000003 = { path = "TalariaLiveActivity"; isa = "PBXGroup"; children = ("B20000000000000000000002",); sourceTree = "<group>"; };
+		B20000000000000000000004 = { isa = "PBXBuildFile"; fileRef = "B20000000000000000000002"; };
+		B20000000000000000000005 = { isa = "PBXSourcesBuildPhase"; buildActionMask = "2147483647"; files = ("B20000000000000000000004",); runOnlyForDeploymentPostprocessing = "0"; };
+		B20000000000000000000006 = { isa = "PBXFrameworksBuildPhase"; buildActionMask = "2147483647"; files = ("B20000000000000000000011",); runOnlyForDeploymentPostprocessing = "0"; };
+		B20000000000000000000007 = { isa = "PBXResourcesBuildPhase"; buildActionMask = "2147483647"; files = (); runOnlyForDeploymentPostprocessing = "0"; };
+		B20000000000000000000008 = { buildConfigurationList = "B2000000000000000000000B"; productReference = "B20000000000000000000001"; productType = "com.apple.product-type.app-extension"; packageProductDependencies = ("B20000000000000000000010",); productName = "TalariaLiveActivity"; isa = "PBXNativeTarget"; buildPhases = ("B20000000000000000000005", "B20000000000000000000006", "B20000000000000000000007",); dependencies = (); name = "TalariaLiveActivity"; buildRules = (); };
+		B20000000000000000000009 = { baseConfigurationReference = "A10000000000000000000080"; isa = "XCBuildConfiguration"; buildSettings = { APPLICATION_EXTENSION_API_ONLY = "YES"; TALARIA_APP_BUNDLE_ID = "xyz.majorminor.talaria"; MARKETING_VERSION = "0.1.0"; INFOPLIST_FILE = "Config/TalariaLiveActivityInfo.plist"; SKIP_INSTALL = "YES"; CODE_SIGN_IDENTITY = "Apple Development"; TARGETED_DEVICE_FAMILY = "1"; GENERATE_INFOPLIST_FILE = "YES"; INFOPLIST_KEY_CFBundleDisplayName = "Talaria Live Activity"; CODE_SIGN_STYLE = "Automatic"; SDKROOT = "iphoneos"; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = "6.0"; IPHONEOS_DEPLOYMENT_TARGET = "18.0"; PRODUCT_BUNDLE_IDENTIFIER = "$(TALARIA_APP_BUNDLE_ID).LiveActivity"; CURRENT_PROJECT_VERSION = "1"; }; name = "Debug"; };
+		B2000000000000000000000A = { baseConfigurationReference = "A10000000000000000000080"; isa = "XCBuildConfiguration"; buildSettings = { APPLICATION_EXTENSION_API_ONLY = "YES"; TALARIA_APP_BUNDLE_ID = "xyz.majorminor.talaria"; MARKETING_VERSION = "0.1.0"; INFOPLIST_FILE = "Config/TalariaLiveActivityInfo.plist"; SKIP_INSTALL = "YES"; CODE_SIGN_IDENTITY = "Apple Development"; TARGETED_DEVICE_FAMILY = "1"; GENERATE_INFOPLIST_FILE = "YES"; INFOPLIST_KEY_CFBundleDisplayName = "Talaria Live Activity"; CODE_SIGN_STYLE = "Automatic"; SDKROOT = "iphoneos"; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = "6.0"; IPHONEOS_DEPLOYMENT_TARGET = "18.0"; PRODUCT_BUNDLE_IDENTIFIER = "$(TALARIA_APP_BUNDLE_ID).LiveActivity"; CURRENT_PROJECT_VERSION = "1"; }; name = "Release"; };
+		B2000000000000000000000B = { isa = "XCConfigurationList"; defaultConfigurationIsVisible = "0"; defaultConfigurationName = "Release"; buildConfigurations = ("B20000000000000000000009", "B2000000000000000000000A",); };
+		B2000000000000000000000C = { isa = "PBXBuildFile"; fileRef = "B20000000000000000000001"; settings = { ATTRIBUTES = ("RemoveHeadersOnCopy",); }; };
+		B2000000000000000000000D = { buildActionMask = "2147483647"; dstSubfolderSpec = "13"; isa = "PBXCopyFilesBuildPhase"; runOnlyForDeploymentPostprocessing = "0"; dstPath = ""; files = ("B2000000000000000000000C",); name = "Embed App Extensions"; };
+		B2000000000000000000000E = { isa = "XCLocalSwiftPackageReference"; relativePath = "TalariaActivityShared"; };
+		B2000000000000000000000F = { isa = "XCSwiftPackageProductDependency"; package = "B2000000000000000000000E"; productName = "TalariaActivityShared"; };
+		B20000000000000000000010 = { isa = "XCSwiftPackageProductDependency"; package = "B2000000000000000000000E"; productName = "TalariaActivityShared"; };
+		B20000000000000000000011 = { isa = "PBXBuildFile"; productRef = "B20000000000000000000010"; };
+		B20000000000000000000012 = { isa = "PBXBuildFile"; productRef = "B2000000000000000000000F"; };
+		B20000000000000000000013 = { isa = "PBXContainerItemProxy"; containerPortal = "A10000000000000000000001"; remoteGlobalIDString = "B20000000000000000000008"; remoteInfo = "TalariaLiveActivity"; proxyType = "1"; };
+		B20000000000000000000014 = { isa = "PBXTargetDependency"; target = "B20000000000000000000008"; targetProxy = "B20000000000000000000013"; };
 	};
 	rootObject = A10000000000000000000001 /* Project object */;
 }

@@ -8,9 +8,23 @@ struct RootView: View {
     @Environment(AppPreferences.self) private var preferences
     @Environment(\.scenePhase) private var scenePhase
 
+    @State private var liveActivity = HermesLiveActivityController()
+
     var body: some View {
         @Bindable var router = router
         shell
+        .safeAreaInset(edge: .top) {
+            if HermesLiveActivityController.demoEnabled {
+                HStack {
+                    Button(liveActivity.demoRunning ? "Live Activity demo running" : "Run Live Activity demo") { liveActivity.startDemo() }
+                        .disabled(liveActivity.demoRunning).accessibilityIdentifier("live-activity-demo")
+                    Text(liveActivity.message).font(.caption)
+                }.font(.footnote).padding(8).background(.bar)
+            }
+        }
+        .task { if HermesLiveActivityController.demoEnabled { liveActivity.startDemo() } }
+        .onChange(of: environment.activity.runs, initial: true) { _, _ in updateLiveActivity() }
+        .onChange(of: connection.connection) { _, _ in updateLiveActivity() }
         .overlay(alignment: .bottom) { HeldVoiceOverlay() }
         .sheet(item: $router.askSeed) { AskSheet(seed: $0) }
         .sheet(item: $router.captureSeed) { CaptureSheet(seed: $0) }
@@ -24,12 +38,17 @@ struct RootView: View {
             // reconnect (replaying missed events) if the link dropped.
             let offline = connection.connection == .bridgeOffline || connection.connection == .hermesOffline
             if phase == .active {
+                updateLiveActivity()
                 Task {
                     if offline { await connection.reconnect() }
                     await environment.refreshAll()
                 }
             }
         }
+    }
+
+    private func updateLiveActivity() {
+        liveActivity.update(runs: environment.activity.runs.values.sorted { $0.id < $1.id }, profiles: environment.profiles, connected: connection.connection.isConnected)
     }
 
     private var accessoryVisible: Bool {
