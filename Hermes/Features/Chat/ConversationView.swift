@@ -54,9 +54,6 @@ struct ConversationView: View {
                 if focused { withAnimation { proxy.scrollTo(bottomID, anchor: .bottom) } }
             }
         }
-        .pinnedTopBar {
-            if let run = model.activeRun ?? environment.activity.runs.values.first(where: { $0.conversationID == model.conversationID && $0.state == .unknown }) { WorkStatusBar(run: run, steer: { composerFocused = true }, steps: { stepsRun = run }) }
-        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let pending = environment.needsYou.all.first(where: { $0.workItemID == model.conversationID && ($0.kind == .question || $0.kind == .decision || $0.kind == .approval) }) { NeedsYouCard(item: pending) }
             if model.conversation?.readOnly == true {

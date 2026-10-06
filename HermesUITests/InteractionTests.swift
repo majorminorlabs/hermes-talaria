@@ -155,12 +155,12 @@ final class InteractionTests: XCTestCase {
     }
     func testSteerStopAndSteps() {
         launch(); tab("Threads"); row("Researcher").tap()
-        XCTAssertTrue(app.buttons["work-status-stop"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["Stop run"].waitForExistence(timeout:5))
+        XCTAssertFalse(app.buttons["work-status-stop"].exists)
         let field = app.textFields["Add an instruction…"].exists ? app.textFields["Add an instruction…"] : app.textFields.firstMatch
         field.tap(); field.typeText("Focus on the latest hour")
-        app.buttons.matching(identifier: "Add instruction").lastElement.tap()
-        app.buttons["work-status-stop"].tap(); XCTAssertTrue(app.navigationBars["Stop"].waitForExistence(timeout:5))
-        app.buttons["risk-confirm"].tap()
+        app.buttons["Send instruction"].tap()
+        app.buttons["Stop run"].tap()
         app.swipeUp()
         XCTAssertTrue(app.staticTexts["Partial: stopped before finishing"].waitForExistence(timeout:10) || app.staticTexts["Stopped"].firstMatch.waitForExistence(timeout:5))
         app.buttons["steps-button"].firstMatch.tap(); XCTAssertTrue(app.navigationBars["Steps"].waitForExistence(timeout:5))
