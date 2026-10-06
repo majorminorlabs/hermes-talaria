@@ -721,6 +721,52 @@ struct BridgeIntegrationTests {
         #expect(recorder.requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer token")
     }
 
+    @Test func expiredStreamCursorResynchronizesAndResumesFromFreshCursor() async throws {
+        let hostID = "studio-\(UUID().uuidString)"
+        let domain = uniqueBridgeTestHost()
+        let recorder = BridgeRequestRecorder()
+        let event = bridgeEvent(type: "assistant.completed", sequence: 43, text: "Recovered after expiry")
+        BridgeStubURLProtocol.register(host: domain) { request in
+            recorder.append(request)
+            if request.url?.path.hasSuffix("/capabilities") == true { return capabilitiesResponse() }
+            if request.url?.path.hasSuffix("/runs/run-one") == true {
+                return BridgeStubResponse(body: encodedBridgeJSON(runSnapshot(text: "", cursor: "test-epoch:42")))
+            }
+            let after = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "after" })?.value
+            if after == "test-epoch:0" {
+                return BridgeStubResponse(status: 409, body: #"{"error":{"code":"resync_required","message":"Events have expired; hydrate resource snapshots","details":{"cursor":"test-epoch:42"}}}"#)
+            }
+            return BridgeStubResponse(contentType: "text/event-stream", body: sseFrame(event))
+        }
+        defer { BridgeStubURLProtocol.unregister(host: domain) }
+        let client = BridgeHermesClient(credentials: BridgeTestCredentialStore(hostID: hostID, token: "token"), session: makeBridgeTestSession(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await client.connect(to: bridgeHost(id: hostID, domain: domain))
+        let stream = client.subscribe(after: EventCursor(value: "test-epoch:0"))
+        var resynced = false
+        var recovered = false
+        var statuses = 0
+        for await envelope in stream {
+            if case .hostStatus = envelope.event { statuses += 1 }
+            if case .resyncRequired = envelope.event {
+                #expect(envelope.cursor.value == "test-epoch:42")
+                resynced = true
+                // The real consumer commits freshly hydrated snapshots before acknowledging.
+                await client.acknowledge(envelope.cursor)
+            } else if envelope.cursor.value == "test-epoch:43" {
+                recovered = true
+                #expect(assistantMessage(in: envelope.event)?.plainText == "Recovered after expiry")
+                await client.acknowledge(envelope.cursor)
+                break
+            }
+            if statuses >= 5 { break }
+        }
+        await client.disconnect(hostID: hostID)
+        #expect(resynced && recovered)
+        let streams = recorder.requests.filter { $0.url?.path.hasSuffix("/events/stream") == true }
+        #expect(streams.count == 2)
+        #expect(URLComponents(url: try #require(streams.last?.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "after" })?.value == "test-epoch:42")
+    }
+
     @Test func byteSSEParserHandlesLineEndingsSplitUTF8AndMultilineData() throws {
         let wire = "id: journal:41\r\nevent: assistant.delta\r\ndata: café\r\ndata: second line\r\n\r\n" +
             "id: journal:42\nevent: tool.completed\ndata: {\"ok\":\ndata: true}\n\n"

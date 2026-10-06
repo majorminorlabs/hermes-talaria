@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// One aggregate, one SSE subscription. Studio remains the owner of execution.
 final class BridgeHermesClient: HostService, HomeService, ConversationService, RunService, ProfileService,
@@ -662,6 +663,7 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         var attempt = 0
         while !Task.isCancelled, generation == subscription {
             guard let t = transport else { try? await Task.sleep(for:.milliseconds(100)); continue }
+            var stage = "capabilities"
             do {
                 if attempt > 0 { publishStatus(.reconnecting(attempt:attempt)) }
                 let caps = try await t.request(method:"GET",path:"/capabilities")
@@ -673,12 +675,14 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
                     guard !Task.isCancelled, generation == subscription else { return }
                     seenSeq = BridgeMapping.sequence(cursor); epoch = cursor.split(separator:":").first.map(String.init) ?? ""
                 }
+                stage = "stream"
                 for try await frame in await t.events(after:committedCursor?.value) {
                     try Task.checkCancellation()
                     guard generation == subscription else { return }
                     let json = try JSONDecoder().decode(BridgeJSON.self,from:Data(frame.data.utf8))
                     if frame.event == "stream.resync_required" { throw HermesError.resyncRequired(json["error"]["details"]["cursor"].string ?? "") }
                     if frame.event == "stream.checkpoint" {
+                        stage = "checkpoint"
                         if let cursor = json["cursor"].string, cursor != committedCursor?.value { await deliver(.checkpoint,cursor:cursor) }
                         guard !Task.isCancelled, generation == subscription else { return }
                         // A checkpoint proves this stream is alive. An auxiliary
@@ -688,18 +692,21 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
                         do { _ = try await status(hostID:hostID) }
                         catch HermesError.timeout { }
                         catch HermesError.bridgeUnreachable { }
+                        stage = "stream"
                         continue
                     }
                     guard let cursor = json["cursor"].string, let seq = json["seq"].int else { throw HermesError.rejected("Malformed bridge event") }
                     let incomingEpoch = cursor.split(separator:":").first.map(String.init) ?? ""
                     guard incomingEpoch == epoch else { throw HermesError.resyncRequired(cursor) }
                     if seq <= seenSeq { continue }
+                    stage = "event:" + (json["type"].string ?? "unknown")
                     let event = try await consume(json:json)
                     guard !Task.isCancelled, generation == subscription else { return }
                     await deliver(event,cursor:cursor)
                     guard !Task.isCancelled, generation == subscription else { return }
                     seenSeq = seq
                     attempt = 0
+                    stage = "stream"
                 }
                 throw HermesError.bridgeUnreachable
             } catch is CancellationError { return }
@@ -714,6 +721,18 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
                 seenSeq = BridgeMapping.sequence(fresh); epoch = fresh.split(separator:":").first.map(String.init) ?? ""
             } catch {
                 guard !Task.isCancelled, generation == subscription else { return }
+                // Classification only: no URLs, credentials, event bodies or chat text.
+                let failure: String = switch error as? HermesError {
+                case .notFound: "notFound"
+                case .timeout: "timeout"
+                case .bridgeUnreachable: "bridgeUnreachable"
+                case .hermesOffline: "hermesOffline"
+                case .unauthorized: "unauthorized"
+                case .rejected(let reason):
+                    ["Malformed bridge event", "The bridge did not open an event stream.", "Bridge event exceeds the streaming limit", "The bridge request failed. Try again after checking host status.", "This action isn't permitted by the bridge.", "The bridge rejected the request. Check its fields and try again."].contains(reason) ? reason : "rejected"
+                default: String(reflecting: type(of: error))
+                }
+                Logger(subsystem: "Talaria.Bridge", category: "Connection").notice("stream failed stage=\(stage, privacy: .public) error=\(failure, privacy: .public)")
                 publishStatus(state(for:error))
                 if (error as? HermesError) == .unauthorized {
                     // A rejected credential needs deliberate pairing. No auth retry storm.

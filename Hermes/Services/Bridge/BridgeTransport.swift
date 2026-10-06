@@ -289,7 +289,19 @@ actor BridgeTransport {
                     guard let response = response as? HTTPURLResponse else {
                         throw HermesError.bridgeUnreachable
                     }
-                    try Self.validate(response: response, data: Data(), mutationKey: nil)
+                    // Errors arrive as JSON before SSE starts. Preserve the
+                    // resync cursor in a 409 body instead of reconnecting forever
+                    // with the same expired journal position.
+                    if !(200..<300).contains(response.statusCode) {
+                        var errorBody = Data()
+                        for try await byte in bytes {
+                            guard errorBody.count < 64 * 1024 else {
+                                throw HermesError.rejected("The bridge error response exceeds the size limit.")
+                            }
+                            errorBody.append(byte)
+                        }
+                        try Self.validate(response: response, data: errorBody, mutationKey: nil)
+                    }
                     guard response.value(forHTTPHeaderField: "Content-Type")?.lowercased().contains("text/event-stream") == true else {
                         throw HermesError.rejected("The bridge did not open an event stream.")
                     }
