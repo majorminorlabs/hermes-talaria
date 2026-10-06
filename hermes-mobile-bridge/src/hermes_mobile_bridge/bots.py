@@ -153,6 +153,39 @@ class BotMode:
         from .bot_management import BotManagement
         return await BotManagement(self.service, self.auth).duplicate(bid)
 
+    async def create_thread(self, bid, fields, command_id):
+        source, name, backend, bot = await self.resolve(bid)
+        self.service.require(self.auth, source, 'chat.control')
+        if not self.can_control(backend):
+            raise Problem(403, 'bot_conversation_unavailable', 'Agent thread control is not enabled')
+        title = fields.get('title') or ('New ask · ' + command_id[:8])
+        if len(title) > 200 or title == 'Bot Chat':
+            raise Problem(400, 'invalid_title', 'Choose a work title, not the canonical Bot Chat title')
+        overrides = only(fields, 'model provider reasoning_effort')
+        if bool(fields.get('model')) != bool(fields.get('provider')):
+            raise Problem(400, 'invalid_model', 'Supply model and provider together')
+        if fields.get('reasoning_effort') not in {None, 'none', 'minimal', 'low', 'medium', 'high', 'xhigh'}:
+            raise Problem(400, 'invalid_reasoning', 'Unsupported reasoning effort')
+        params = {'profile': name, 'title': title, 'source': 'mobile',
+                  'follow_profile_config': not bool(overrides), 'close_on_disconnect': False,
+                  'idempotency_key': command_id, **overrides}
+        if fields.get('workspace'):
+            if fields['workspace'] not in backend.cfg['workspaces']:
+                raise Problem(400, 'unknown_workspace', 'Choose a configured Studio workspace')
+            params['cwd'] = backend.cfg['workspaces'][fields['workspace']]
+        result = await backend.rpc('session.create', params)
+        sid = identifier(result['stored_session_id'])
+        live = identifier(result['session_id'])
+        cid = opaque(source, sid)
+        data = only(result.get('info', {}), 'model provider reasoning_effort cwd') | {
+            'title': title, 'source': 'mobile', 'canonical': False, 'bot_id': bid,
+            'bot_profile': name, 'bot_name': bot_row(source, bot)['name'],
+            'follow_profile_config': params['follow_profile_config']}
+        self.service.store.save_conversation(cid, source, sid, live, True, data)
+        # Eagerly persist the empty session, as canonical chat does, without a model turn.
+        await backend.rpc('session.title', {'session_id': live, 'title': title})
+        return self.service.conversation_view(self.service.store.get('conversations', cid))
+
     async def conversation(self, bid):
         source, name, backend, bot = await self.resolve(bid)
         row = await self.lookup(backend, name, bot)
@@ -184,7 +217,7 @@ class BotMode:
     def bind(self, bid, source, name, bot, row, live=None, owned=False):
         store = self.service.store
         sid = identifier(row.get('resolved_id') or row['id'])
-        existing = store.db.execute("SELECT id FROM conversations WHERE profile=? AND json_extract(data,'$.bot_id')=?", (source, bid)).fetchone()
+        existing = store.db.execute("SELECT id FROM conversations WHERE profile=? AND json_extract(data,'$.bot_id')=? AND json_extract(data,'$.canonical')=1", (source, bid)).fetchone()
         alias = store.db.execute('SELECT conversation_id FROM aliases WHERE profile=? AND stored_id=?', (source, sid)).fetchone()
         cid = existing[0] if existing else alias[0] if alias else 'botchat.' + bid
         old = store.db.execute('SELECT live_id FROM conversations WHERE id=?', (cid,)).fetchone()

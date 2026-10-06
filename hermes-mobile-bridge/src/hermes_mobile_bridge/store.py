@@ -183,13 +183,15 @@ class Store:
         rows = self.db.execute(sql, args).fetchall()
         return {"events": [json.loads(r["data"]) for r in rows if r["profile"] in profiles], "cursor": f"{self.epoch}:{rows[-1]['seq'] if rows else int(self.cursor().split(':')[1])}", "has_more": len(rows) == limit}
 
-    def command_begin(self, cid, credential, body):
+    def command_begin(self, cid, credential, body, replay_safe=False):
         digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         old = self.db.execute("SELECT * FROM commands WHERE id=?", (cid,)).fetchone()
         if old:
             if old["credential"] != credential or old["digest"] != digest:
                 raise Problem(409, "command_conflict", "Command ID was used for another request")
             if old["status"] in {"pending", "uncertain"}:
+                if replay_safe:
+                    return None
                 raise Problem(409, "command_uncertain", "Command may have reached Hermes; inspect state before retrying")
             return json.loads(old["result"])
         self.db.execute("INSERT INTO commands VALUES (?,?,?,'pending',NULL)", (cid, credential, digest))

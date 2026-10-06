@@ -23,6 +23,7 @@ async def serve(app, port=0):
 
 class FakeHermes:
     def __init__(self, root):
+        self.comments = {}
         self.root = root
         root.mkdir()
         self.sessions, self.jobs, self.cards = {}, {}, {}
@@ -63,7 +64,10 @@ class FakeHermes:
                 result = {'found': False}
             elif method == 'session.list':
                 row = next((x for x in self.bot_roster if x['name'] == p.get('profile')), {})
-                result = {'sessions': [row['canonical_session']] if row.get('canonical_session') else []}
+                if p.get('title'):
+                    result = {'sessions': [row['canonical_session']] if row.get('canonical_session') else []}
+                else:
+                    result = {'sessions': [{'id': x['stored'], 'resolved_id': x['stored'], 'title': x['title']} for x in self.sessions.values() if self.profile_of(x) == p.get('profile')]}
                 if self.fail_registry:
                     error = {'code': -32000, 'message': 'registry unavailable'}
             elif method == 'session.active_list':
@@ -79,11 +83,11 @@ class FakeHermes:
                 row = next((r for r in self.bot_roster if r['name'] == self.profile_of(x)), None)
                 if self.fail_title:
                     error = {'code': -32000, 'message': 'title write unavailable'}
-                elif row and row.get('canonical_session') and row['canonical_session']['id'] != x['stored']:
+                elif p['title'] == 'Bot Chat' and row and row.get('canonical_session') and row['canonical_session']['id'] != x['stored']:
                     error = {'code': 4022, 'message': 'title taken'}
                 else:
                     x['title'] = p['title']
-                    if row:
+                    if row and p['title'] == 'Bot Chat':
                         row['canonical_session'] = {'id': x['stored'], 'resolved_id': x['stored'], 'title': p['title']}
                     result = {'ok': True, 'title': p['title']}
             elif method == 'client.capabilities':
@@ -222,6 +226,9 @@ class FakeHermes:
             tid = path.split('/')[5]
             if tid not in self.cards:
                 raise web.HTTPNotFound()
+            if path.endswith('/comments') and method == 'POST':
+                self.comments.setdefault(tid,[]).append(await request.json())
+                return web.json_response({'ok':True})
             if method == 'PATCH':
                 self.cards[tid].update(await request.json())
                 return web.json_response({'ok': True})
@@ -252,8 +259,9 @@ class Harness:
         self.client = aiohttp.ClientSession(headers={'Authorization': 'Bearer ' + self.token})
         await eventually(lambda: self.service.backends['default'].connected)
 
-    async def request(self, method, path, body=None, key=None, expected=200):
+    async def request(self, method, path, body=None, key=None, expected=200, token=None):
         headers = {'Idempotency-Key': key or str(uuid.uuid4())} if method != 'GET' else {}
+        if token: headers['Authorization'] = 'Bearer ' + token
         async with self.client.request(method, f'http://127.0.0.1:{self.port}/mobile/v1' + path, json=body if method != 'GET' else None, headers=headers) as res:
             data = await res.json()
             assert res.status == expected, data

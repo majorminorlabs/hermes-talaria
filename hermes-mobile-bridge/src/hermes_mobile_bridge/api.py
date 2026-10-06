@@ -61,10 +61,10 @@ async def contract(request, handler):
                 raise Problem(400, "invalid_request", "JSON object required")
             # Scope check precedes command journal access; cached mutations also
             # respect revoked/reduced credentials.
-            needed = "chat.control" if any(s in request.path for s in ("/conversations", "/runs", "/attachments", "/bots")) else "approvals.respond" if "/attention" in request.path else "tasks.manage"
+            needed = "chat.control" if any(s in request.path for s in ("/conversations", "/runs", "/attachments", "/bots", "/captures")) else "approvals.respond" if "/attention" in request.path else "tasks.manage"
             if needed not in request[AUTH]["scopes"]:
                 raise Problem(403, "forbidden", "Credential lacks action scope")
-            old = service.store.command_begin(command_id, request[AUTH]["id"], {"method": request.method, "path": request.path, "query": list(request.query.items()), "body": request[BODY]})
+            old = service.store.command_begin(command_id, request[AUTH]["id"], {"method": request.method, "path": request.path, "query": list(request.query.items()), "body": request[BODY]}, replay_safe=request.path in {PREFIX + "/captures", PREFIX + "/captures/uploads"})
             if old is not None:
                 return web.json_response(old["body"], status=old["status"])
         command_started = command_id is not None
@@ -111,7 +111,7 @@ async def capabilities(request):
         b = s.backends[p]
         paths = b.paths
         available = lambda route: b.connected and route in paths
-        result[p] = {"health": b.health(), "features": {"sessions": b.connected, "runs": b.connected, "runReplay": True, "stop": b.connected, "steering": b.connected, "approvals": {"observe": b.connected, "respond": False, "reason": "upstream_fifo_without_exact_target", "clarifications": b.connected and (b.server_requests_supported or b.cfg.get("installed_commit") != "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1")}, "profiles": True, "cron": available("/api/cron/jobs"), "kanban": bool(b.cfg["boards"]) and available("/api/plugins/kanban/board"), "usage": available("/api/analytics/usage"), "skills": available("/api/skills"), "tools": available("/api/tools/toolsets"), "mcp": available("/api/mcp/servers"), "artifacts": bool(b.cfg["artifact_roots"]), "botMode": b.connected and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botChat": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botRooms": False, "attachments": b.connected and b.cfg.get("installed_commit") in {"2a4c9afd7bd", "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "imageUpload": b.connected and b.cfg.get("installed_commit") == "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "desktop_contract_audited": 2, "audited_commit": b.cfg.get("installed_commit") or "2a4c9afd7bd", "installed_commit": b.cfg.get("installed_commit"), "boards": b.cfg["boards"], "workspaces": [{"id": k, "name": k} for k in b.cfg["workspaces"]]}
+        result[p] = {"health": b.health(), "features": {"sessions": b.connected, "runs": b.connected, "runReplay": True, "stop": b.connected, "steering": b.connected, "approvals": {"observe": b.connected, "respond": False, "reason": "upstream_fifo_without_exact_target", "clarifications": b.connected and (b.server_requests_supported or b.cfg.get("installed_commit") != "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1")}, "profiles": True, "cron": available("/api/cron/jobs"), "kanban": bool(b.cfg["boards"]) and available("/api/plugins/kanban/board"), "usage": available("/api/analytics/usage"), "skills": available("/api/skills"), "tools": available("/api/tools/toolsets"), "mcp": available("/api/mcp/servers"), "artifacts": bool(b.cfg["artifact_roots"]), "botMode": b.connected and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botChat": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botThreads": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "captures": True, "botRooms": False, "attachments": b.connected and b.cfg.get("installed_commit") in {"2a4c9afd7bd", "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "imageUpload": b.connected and b.cfg.get("installed_commit") == "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "desktop_contract_audited": 2, "audited_commit": b.cfg.get("installed_commit") or "2a4c9afd7bd", "installed_commit": b.cfg.get("installed_commit"), "boards": b.cfg["boards"], "workspaces": [{"id": k, "name": k} for k in b.cfg["workspaces"]]}
         result[p]["features"].update(BotMode(s, request[AUTH]).capabilities(p))
     return web.json_response({"api_version": 1, "bridge_version": __version__, "journal_epoch": s.store.epoch, "cursor": s.store.cursor(), "scopes": request[AUTH]["scopes"], "profiles": result, "retention": {"global_events": s.cfg["event_limit"], "per_run_events": s.cfg["run_event_limit"], "days": s.cfg["event_days"]}, "coverage": "Controlled runs are bridge-owned desktop sessions; other-process activity is read-only and incomplete"})
 
@@ -160,6 +160,35 @@ async def bot_conversation(request):
     return web.json_response(await adapter.conversation(request.match_info["bid"]))
 
 
+async def command_status(request):
+    s = svc(request)
+    try: cid = str(uuid.UUID(request.match_info['cid']))
+    except ValueError: raise Problem(400, 'invalid_id', 'Provide a command UUID') from None
+    row = s.store.db.execute('SELECT credential,status,result FROM commands WHERE id=?', (cid,)).fetchone()
+    if not row: return web.json_response({'state': 'not_received'})
+    if row['credential'] != request[AUTH]['id']: raise Problem(403, 'forbidden', 'Command belongs to another credential')
+    return web.json_response({'state': row['status'], 'result': json.loads(row['result']) if row['result'] else None})
+
+
+async def capture_save(request):
+    from .captures import Captures
+    body = shape(request[BODY], {"client_capture_id": str, "created_at": str, "kind": str, "text": str, "attachment_ids": list, "context": dict},
+                 ("client_capture_id", "created_at", "kind", "text"), list_limits={"attachment_ids": 4})
+    return web.json_response(svc(request).captures.save(request[AUTH], body), status=201)
+
+
+async def capture_upload(request):
+    from .captures import Captures
+    body = shape(request[BODY], {"name": str, "content_type": str, "content_base64": str}, ("name", "content_type", "content_base64"))
+    return web.json_response(svc(request).captures.upload(request[AUTH], body, request.headers["Idempotency-Key"]), status=201)
+
+
+async def bot_threads(request):
+    fields = shape(request[BODY], {"title": str, "model": str, "provider": str, "reasoning_effort": str, "workspace": str})
+    return web.json_response(await BotMode(svc(request), request[AUTH]).create_thread(
+        request.match_info["bid"], fields, request.headers["Idempotency-Key"]), status=201)
+
+
 async def conversations(request):
     s = svc(request)
     p, b = profile(request, "chat.control" if request.method == "POST" else "read")
@@ -190,11 +219,33 @@ async def conversations(request):
             c = s.store.get("conversations", row[0])
             if c["id"] not in seen and not c["data"].get("canonical") and not c["data"].get("deleted") and s.store.db.execute("SELECT COUNT(*) FROM runs WHERE conversation_id=?", (c["id"],)).fetchone()[0] == 0:
                 output.append(s.conversation_view(c) | {"draft": True})
-    if not request.query.get("q") and query["offset"] == 0 and b.cfg.get("bot_mode_roster") and b.bot_mode_supported:
+    if query["offset"] == 0 and b.cfg.get("bot_mode_roster") and b.bot_mode_supported:
         adapter = BotMode(s, request[AUTH])
         _, roster = await adapter.roster(p)
         for bot in roster:
-            if bot.get("canonical_session"):
+            native = bot['name']
+            if request.query.get('q'):
+                found = await b.rest('GET', '/api/sessions/search', query={'profile': native, 'q': request.query['q'], 'limit': query['limit']})
+                native_rows = found.get('results', [])
+            else:
+                raw_sessions = await b.rpc('session.list', {'profile': native, 'include_hidden': True})
+                native_rows = raw_sessions.get('sessions', [])
+            for row in native_rows:
+                if row.get('title') == 'Bot Chat':
+                    continue
+                sid = row.get('resolved_id') or row.get('session_id') or row.get('id')
+                if not sid:
+                    continue
+                cid = opaque(p, sid)
+                previous = s.store.db.execute('SELECT id FROM conversations WHERE profile=? AND stored_id=?', (p, sid)).fetchone()
+                cid = previous[0] if previous else cid
+                old = s.store.get('conversations', cid) if previous else None
+                s.store.save_conversation(cid, p, sid, old['live_id'] if old else None, old['owned'] if old else False,
+                    only(row, 'title model provider archived started_at message_count last_active preview source') |
+                    {'bot_id': opaque(p,native), 'bot_profile': native, 'canonical': False})
+                output = [r for r in output if r['id'] != cid]
+                output.append(s.conversation_view(s.store.get('conversations', cid)))
+            if bot.get("canonical_session") and not request.query.get("q"):
                 chat = (await adapter.conversation(opaque(p, bot['name'])))["conversation"]
                 output = [r for r in output if r["id"] != chat["id"]]
                 output.append(chat)
@@ -223,7 +274,7 @@ async def conversation_detail(request):
     if request.method == "GET":
         snapshot_cursor = s.store.cursor()
         try:
-            detail, history = await asyncio.gather(b.rest("GET", f"/api/sessions/{sid}", query={"profile": c["profile"]}), b.rest("GET", f"/api/sessions/{sid}/messages", query={"profile": c["profile"]}))
+            detail, history = await asyncio.gather(b.rest("GET", f"/api/sessions/{sid}", query={"profile": s.session_profile(c)}), b.rest("GET", f"/api/sessions/{sid}/messages", query={"profile": s.session_profile(c)}))
         except Problem as err:
             count = s.store.db.execute("SELECT COUNT(*) FROM runs WHERE conversation_id=?", (c["id"],)).fetchone()[0]
             if err.status == 404 and c["owned"] and count == 0:
@@ -237,7 +288,7 @@ async def conversation_detail(request):
             raise Problem(400, "invalid_request", "Provide title or archived")
         if "title" in body and len(body["title"]) > 200:
             raise Problem(400, "invalid_request", "Title is too long")
-        result = await b.rest("PATCH", f"/api/sessions/{sid}", body=body | {"profile": c["profile"]})
+        result = await b.rest("PATCH", f"/api/sessions/{sid}", body=body | {"profile": s.session_profile(c)})
         s.store.save_conversation(c["id"], c["profile"], sid, c["live_id"], c["owned"], body)
         return web.json_response(s.conversation_view(s.store.get("conversations", c["id"])))
     shape(request[BODY], {})
@@ -526,17 +577,36 @@ def board(request, scope="read"):
     return p, b, slug
 
 
+def task_row(service, raw, source, slug):
+    row = task(raw, source, slug)
+    assigned = raw.get('assignee')
+    if assigned and assigned not in service.backends and service.backends[source].cfg.get('bot_mode_roster'):
+        row['assignee'] = opaque(source, assigned)
+    return row
+
+
+async def task_assignee(service, auth, source, value):
+    if value in service.backends:
+        service.require(auth, value, 'tasks.manage')
+        return value
+    actual, name, _, _ = await BotMode(service, auth).resolve(value)
+    if actual != source:
+        raise Problem(403, 'profile_forbidden', 'Assign a native Agent from this board host')
+    service.require(auth, actual, 'tasks.manage')
+    return name
+
+
 async def kanban_list(request):
     s = svc(request)
     p, b, slug = board(request, "read" if request.method == "GET" else "tasks.manage")
     if request.method == "GET":
         raw, workers = await asyncio.gather(b.rest("GET", "/api/plugins/kanban/board", query={"board": slug}), b.rest("GET", "/api/plugins/kanban/workers/active", query={"board": slug}))
         rows = [r for col in raw.get("columns", []) for r in col.get("tasks", [])]
-        return web.json_response({"board": slug, "tasks": [task(r, p, slug) | only(r, "progress link_counts comment_count diagnostics warnings") for r in rows], "workers": [only(w, "run_id task_title profile started_at last_heartbeat_at max_runtime_seconds") | {"status": w.get("task_status", w.get("status")), "assignee": w.get("task_assignee", w.get("assignee"))} | {"task_id": opaque(p, slug + "." + w["task_id"]) if w.get("task_id") else None} for w in workers.get("workers", [])], "workers_checked_at": workers.get("checked_at")})
+        return web.json_response({"board": slug, "tasks": [task_row(s, r, p, slug) | {"supported_targets": task_targets(r)} | only(r, "progress link_counts comment_count diagnostics warnings") for r in rows], "workers": [only(w, "run_id task_title profile started_at last_heartbeat_at max_runtime_seconds") | {"status": w.get("task_status", w.get("status")), "assignee": w.get("task_assignee", w.get("assignee"))} | {"task_id": opaque(p, slug + "." + w["task_id"]) if w.get("task_id") else None} for w in workers.get("workers", [])], "workers_checked_at": workers.get("checked_at")})
     body = shape(request[BODY], {"title": str, "body": str, "assignee": str, "priority": int, "parents": list, "triage": bool, "skills": list, "max_runtime_seconds": int, "workspace": str}, ("title",))
     workspace(s, p, body)
     if body.get("assignee"):
-        s.require(request[AUTH], body["assignee"], "tasks.manage")
+        body["assignee"] = await task_assignee(s, request[AUTH], p, body["assignee"])
     payload = {k: v for k, v in body.items() if k != "workspace"}
     if payload.get("parents"):
         normalized = []
@@ -553,7 +623,7 @@ async def kanban_list(request):
         payload.update(workspace_kind="dir", workspace_path=b.cfg["workspaces"][body["workspace"]])
     raw = await b.rest("POST", "/api/plugins/kanban/tasks", payload, {"board": slug})
     row = raw.get("task", raw)
-    return web.json_response(task(row, p, slug), status=201)
+    return web.json_response(task_row(s, row, p, slug), status=201)
 
 
 def task_targets(row):
@@ -567,7 +637,7 @@ def task_targets(row):
         targets.append("scheduled")
     if state == "ready":
         targets.append("blocked")
-    if state in {"ready", "blocked"}:
+    if state in {"ready", "blocked", "review"}:
         targets.append("done")
     return [x for x in targets if x != state]
 
@@ -584,7 +654,7 @@ async def kanban_detail(request):
     path = "/api/plugins/kanban/tasks/" + identifier(tid)
     if request.method == "GET":
         raw = await b.rest("GET", path, query={"board": slug})
-        return web.json_response({"task": task(raw["task"], p, slug), "links": {kind: [opaque(p, slug + "." + str(x)) for x in raw.get("links", {}).get(kind, [])] for kind in ("parents", "children")}, "diagnostics": raw["task"].get("diagnostics", []), "comments": [only(x, "id author body created_at") for x in raw.get("comments", [])], "attempts": [only(x, "id task_id profile status started_at ended_at outcome summary error last_heartbeat_at max_runtime_seconds") for x in raw.get("runs", [])], "attachments": [only(x, "id filename content_type size created_at") for x in raw.get("attachments", [])], "recent_activity": [only(x, "id kind created_at run_id") | {"details": only(x.get("payload") or {}, "status from to reason summary assignee")} for x in raw.get("events", [])], "supported_targets": task_targets(raw["task"]), "artifact_downloads": "kanban task-scoped endpoint"})
+        return web.json_response({"task": task_row(s, raw["task"], p, slug), "links": {kind: [opaque(p, slug + "." + str(x)) for x in raw.get("links", {}).get(kind, [])] for kind in ("parents", "children")}, "diagnostics": raw["task"].get("diagnostics", []), "comments": [only(x, "id author body created_at") for x in raw.get("comments", [])], "attempts": [only(x, "id task_id profile status started_at ended_at outcome summary error last_heartbeat_at max_runtime_seconds") for x in raw.get("runs", [])], "attachments": [only(x, "id filename content_type size created_at") for x in raw.get("attachments", [])], "recent_activity": [only(x, "id kind created_at run_id") | {"details": only(x.get("payload") or {}, "status from to reason summary assignee")} for x in raw.get("events", [])], "supported_targets": task_targets(raw["task"]), "artifact_downloads": "kanban task-scoped endpoint"})
     if request.method == "PATCH":
         current = await b.rest("GET", path, query={"board": slug})
         if current["task"].get("status") == "running" and request[BODY].get("status"):
@@ -595,7 +665,12 @@ async def kanban_detail(request):
         if "assignee" in body and len(body) != 1:
             raise Problem(400, "separate_assignment", "Change assignment separately; upstream compound updates are not atomic")
         if body.get("assignee"):
-            s.require(request[AUTH], body["assignee"], "tasks.manage")
+            body["assignee"] = await task_assignee(s, request[AUTH], p, body["assignee"])
+        # Hermes preserves a completion summary. Other transitions ignore it;
+        # retain the note as an existing canonical comment before the transition.
+        # This is not atomic; the command receipt forbids replay if interrupted.
+        if body.get("summary") and body.get("status") != "done":
+            await b.rest("POST", path + "/comments", {"body": body.pop("summary"), "author": "Talaria"}, {"board": slug})
         raw = await b.rest("PATCH", path, body, {"board": slug})
         return web.json_response({"acknowledged": True, "task_id": request.match_info["tid"], "refresh_required": True})
     shape(request[BODY], {})
@@ -733,7 +808,7 @@ def create_app(cfg):
     app = web.Application(middlewares=[contract], client_max_size=cfg["upload_limit"] * 2 + 4096)
     app[SERVICE] = s
     routes = [
-        web.get(PREFIX + "/bots/inventory", bot_inventory), web.post(PREFIX + "/bots", bot_create), web.patch(PREFIX + "/bots/{bid}", bot_update), web.post(PREFIX + "/bots/{bid}/hide", bot_hide), web.post(PREFIX + "/bots/{bid}/duplicate", bot_duplicate), web.get(PREFIX + "/bots", bots), web.get(PREFIX + "/bots/{bid}", bot_detail), web.get(PREFIX + "/bots/{bid}/conversation", bot_conversation), web.post(PREFIX + "/bots/{bid}/conversation", bot_conversation),
+        web.get(PREFIX + "/bots/inventory", bot_inventory), web.post(PREFIX + "/bots", bot_create), web.patch(PREFIX + "/bots/{bid}", bot_update), web.post(PREFIX + "/bots/{bid}/hide", bot_hide), web.post(PREFIX + "/bots/{bid}/duplicate", bot_duplicate), web.get(PREFIX + "/bots", bots), web.get(PREFIX + "/bots/{bid}", bot_detail), web.get(PREFIX + "/bots/{bid}/conversation", bot_conversation), web.post(PREFIX + "/bots/{bid}/conversations", bot_threads), web.post(PREFIX + "/bots/{bid}/conversation", bot_conversation),
         web.get(PREFIX + "/capabilities", capabilities), web.get(PREFIX + "/home", home), web.get(PREFIX + "/profiles", profiles), web.get(PREFIX + "/profiles/{pid}", profile_detail),
         web.get(PREFIX + "/conversations", conversations), web.post(PREFIX + "/conversations", conversations),
         web.get(PREFIX + "/conversations/{cid}", conversation_detail), web.patch(PREFIX + "/conversations/{cid}", conversation_detail), web.delete(PREFIX + "/conversations/{cid}", conversation_detail),
@@ -743,7 +818,7 @@ def create_app(cfg):
         web.get(PREFIX + "/inventory/{resource}", inventory), web.get(PREFIX + "/cron", cron_jobs), web.post(PREFIX + "/cron", cron_jobs),
         web.get(PREFIX + "/cron/{jid}", cron_detail), web.patch(PREFIX + "/cron/{jid}", cron_detail), web.delete(PREFIX + "/cron/{jid}", cron_detail), web.post(PREFIX + "/cron/{jid}/{action}", cron_detail),
         web.get(PREFIX + "/kanban/tasks", kanban_list), web.post(PREFIX + "/kanban/tasks", kanban_list), web.get(PREFIX + "/kanban/tasks/{tid}", kanban_detail), web.patch(PREFIX + "/kanban/tasks/{tid}", kanban_detail), web.delete(PREFIX + "/kanban/tasks/{tid}", kanban_detail), web.get(PREFIX + "/kanban/tasks/{tid}/attachment", kanban_attachment), web.post(PREFIX + "/kanban/tasks/{tid}/{action}", kanban_action),
-        web.post(PREFIX + "/attachments", attachment_upload), web.get(PREFIX + "/conversations/{cid}/artifacts", artifact_list), web.get(PREFIX + "/artifacts/{aid}", artifact_download), web.get(PREFIX + "/artifacts/{aid}/{download:download}", artifact_download),
+        web.get(PREFIX + "/commands/{cid}", command_status), web.post(PREFIX + "/captures", capture_save), web.post(PREFIX + "/captures/uploads", capture_upload), web.post(PREFIX + "/attachments", attachment_upload), web.get(PREFIX + "/conversations/{cid}/artifacts", artifact_list), web.get(PREFIX + "/artifacts/{aid}", artifact_download), web.get(PREFIX + "/artifacts/{aid}/{download:download}", artifact_download),
     ]
     app.add_routes(routes)
     async def lifecycle(app):

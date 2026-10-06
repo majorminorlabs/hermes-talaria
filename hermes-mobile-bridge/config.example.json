@@ -2,6 +2,7 @@
   "listen_host": "127.0.0.1",
   "listen_port": 8787,
   "state_dir": "/path/to/home/.local/state/hermes-mobile-bridge",
+  "captures_root": "/path/to/home/.local/state/hermes-mobile-bridge/captures",
   "event_limit": 10000,
   "run_event_limit": 2000,
   "event_days": 7,

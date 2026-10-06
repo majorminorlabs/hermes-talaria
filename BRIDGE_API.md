@@ -229,3 +229,35 @@ Files are bounded to 10 MiB each (or a lower configured limit). Staging, quotas,
 MIME checks, expiration and native photo/camera/dictation behavior are detailed in
 [Attachments and voice](ATTACHMENTS_AND_VOICE.md). A staged artifact has no run ID
 until submit. Canonical upload/run paths retain the native bot profile boundary.
+
+## vNext Phase 1 contract additions
+
+These additions are development behavior on the Phase 1 branch, not a modified
+public v0.1.0 release. Existing endpoints remain compatible.
+
+| Method/path | Request | Response |
+|---|---|---|
+| POST /bots/{id}/conversations | `{title?,model?,provider?,reasoning_effort?,workspace?}` | 201 independent native-profile Conversation with `bot_id` |
+| POST /captures/uploads | `{name,content_type,content_base64}` | 201 `{upload_id,name,content_type,size}`; accepts `audio/mp4` |
+| POST /captures | `{client_capture_id,created_at,kind,text,attachment_ids?,context?}` | 201 `{capture_id,stored_at}` only after durable persistence |
+| GET /commands/{id} | UUID from this device's command | `{state,result?}`; missing receipt is `not_received`, never dispatches |
+
+Features advertise `botThreads` and `captures`. B1 permits creation-time
+workspace IDs from the configured allowlist. Native Agent sessions appear in
+`GET /conversations` and its Hermes-backed search; canonical `Bot Chat` stays
+separate. Capture context permits `thread_id`, `agent_id`, `tag` (strings) and
+`transcribed_on_device` (Boolean). Capture bytes never undergo summarization or
+normalization. A device-scoped capture ID rejects changed content.
+
+Only `/captures` and `/captures/uploads` may safely recover an interrupted
+receipt with the exact original key/body; no Ask/control command gains that
+exception. `GET /commands/{id}` requires read access and rejects another device's
+receipt. Talaria uses it to distinguish a recorded result from pending or
+uncertain execution, and requires an explicit tap for any permitted Ask retry.
+
+Kanban list rows include `supported_targets`; review includes `done`, `ready` and
+`todo` where the audited upstream permits them. Running work still requires
+reclaim. A completion summary is part of the original PATCH. A note on another
+transition is preserved as a comment before the PATCH (two non-atomic writes).
+Optional clarification `recommended`, `default` and `on_timeout` are observational
+metadata; the bridge does not fabricate a choice or postpone a deadline.

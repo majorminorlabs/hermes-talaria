@@ -20,6 +20,8 @@ class Service:
         self.backends = {name: Backend(name, b, self.event, self.health_changed) for name, b in cfg["backends"].items()}
         from .uploads import Uploads
         self.uploads = Uploads(self)
+        from .captures import Captures
+        self.captures = Captures(self)
         self.locks = {}
         self.changed = asyncio.Condition()
         self.maintenance = set()
@@ -74,7 +76,7 @@ class Service:
 
     def conversation_view(self, row):
         data = row["data"]
-        result = {"id": row["id"], "profile": data.get("bot_id") or row["profile"], "owned": bool(row["owned"]),
+        result = {"id": row["id"], "profile": data.get("bot_id") or row["profile"], "owned": bool(row["owned"]), "is_bot_chat": bool(data.get("canonical")),
                   **only(data, "title model provider reasoning_effort cwd source archived started_at message_count last_active preview canonical bot_id bot_name bot_profile")}
         if data.get("canonical"):
             result.update(title=data["bot_name"], read_only=not self.backends[row["profile"]].cfg.get("bot_chat_control", False))
@@ -86,6 +88,15 @@ class Service:
 
     async def refresh_bot_binding(self, conv, control=False):
         if not conv["data"].get("canonical"):
+            if conv["data"].get("bot_id"):
+                from .bots import BotMode
+                source = conv["profile"]
+                adapter = BotMode(self, {"profiles": [source], "scopes": ["read", "chat.control"]})
+                actual, name, backend, _ = await adapter.resolve(conv["data"]["bot_id"])
+                if actual != source or name != self.session_profile(conv):
+                    raise Problem(409, "bot_identity_mismatch", "Agent thread identity changed")
+                if control and not adapter.can_control(backend):
+                    raise Problem(403, "bot_chat_read_only", "Agent thread control disabled")
             return conv
         from .bots import BotMode
         source = conv["profile"]
@@ -211,11 +222,11 @@ class Service:
             if kind == "approval.request":
                 for existing in self.store.db.execute("SELECT data FROM attention WHERE run_id=?", (rid,)).fetchall():
                     item = json.loads(existing[0])
-                    if item["kind"] == "approval" and item["state"] == "pending" and item["generation"] == self.backends[profile].generation and item["details"] == only(payload, "command description pattern_key pattern_keys allow_permanent question choices"):
+                    if item["kind"] == "approval" and item["state"] == "pending" and item["generation"] == self.backends[profile].generation and item["details"] == only(payload, "command description pattern_key pattern_keys allow_permanent question choices recommended default on_timeout"):
                         return
             aid = uuid.uuid4().hex
             exact = kind == "clarify.request" and bool(payload.get("request_id"))
-            item = {"id": aid, "run_id": rid, "conversation_id": run["conversation_id"], "profile": profile, "kind": "clarification" if exact else "approval" if kind == "approval.request" else "local_terminal_input" if kind == "terminal.read.request" else "local_secret_input", "state": "pending", "observed_at": now(), "expires_at": now() + 290, "can_respond": exact, "limitation": None if exact else "upstream_fifo_without_exact_target" if kind == "approval.request" else "local_terminal_buffer_required" if kind == "terminal.read.request" else "local_only_secret_input", "details": only(payload, "command description pattern_key pattern_keys allow_permanent question choices"), "request_id": payload.get("request_id"), "generation": self.backends[profile].generation}
+            item = {"id": aid, "run_id": rid, "conversation_id": run["conversation_id"], "profile": profile, "kind": "clarification" if exact else "approval" if kind == "approval.request" else "local_terminal_input" if kind == "terminal.read.request" else "local_secret_input", "state": "pending", "observed_at": now(), "expires_at": now() + 290, "can_respond": exact, "limitation": None if exact else "upstream_fifo_without_exact_target" if kind == "approval.request" else "local_terminal_buffer_required" if kind == "terminal.read.request" else "local_only_secret_input", "details": only(payload, "command description pattern_key pattern_keys allow_permanent question choices recommended default on_timeout"), "request_id": payload.get("request_id"), "generation": self.backends[profile].generation}
             self.store.db.execute("INSERT INTO attention VALUES (?,?,?,?)", (aid, rid, profile, json.dumps(item)))
             self.store.db.commit()
             latest = self.store.get("runs", rid)
@@ -248,7 +259,7 @@ class Service:
             item.update(kind="clarification" if method == "clarify" else "approval", state="responded" if locked else "pending",
                         can_respond=method == "clarify" and not locked and item["expires_at"] > now(),
                         limitation=None if method == "clarify" else "local_client_required", generation=self.backends[profile].generation,
-                        details=only(question, "question choices multi_select") if method == "clarify" else only(params, "command description"))
+                        details=only(question, "question choices multi_select recommended default on_timeout") if method == "clarify" else only(params, "command description"))
             self.store.db.execute("INSERT INTO attention VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data", (item["id"], run["id"], profile, json.dumps(item)))
             self.store.db.commit()
             self.store.update_run(run["id"], "waiting_for_input")
@@ -321,7 +332,7 @@ class Service:
                 # Only reconnect to the SAME previously owned live handle. Do
                 # not build a replacement agent or automatically replay a prompt.
                 try:
-                    res = await backend.rpc("session.resume", {"session_id": conv["stored_id"], **({"profile": self.session_profile(conv), "close_on_disconnect": False} if conv["data"].get("canonical") else {})})
+                    res = await backend.rpc("session.resume", {"session_id": conv["stored_id"], **({"profile": self.session_profile(conv), "close_on_disconnect": False} if conv["data"].get("bot_profile") else {})})
                 except Problem:
                     continue
                 if res.get("session_id") != row["live_id"] or (conv["data"].get("canonical") and not self.profile_matches(res, self.session_profile(conv))):
@@ -366,7 +377,7 @@ class Service:
             raise Problem(410, "conversation_deleted", "Conversation was deleted")
         if not backend.connected:
             raise Problem(503, "upstream_unavailable", "Hermes is offline")
-        if conv["data"].get("canonical"):
+        if conv["data"].get("bot_profile"):
             name = self.session_profile(conv)
             # Explicit-profile resume matches (profile_home, stored key), unlike active_list's unscoped keys.
             result = await backend.rpc("session.resume", {"session_id": conv["stored_id"], "profile": name, "close_on_disconnect": False})
@@ -389,7 +400,7 @@ class Service:
             raise Problem(409, "conversation_busy", "Conversation is executing or awaiting input")
         if matching:
             return conv["live_id"]
-        result = await backend.rpc("session.resume", {"session_id": conv["stored_id"], **({"profile": self.session_profile(conv), "close_on_disconnect": False} if conv["data"].get("canonical") else {})})
+        result = await backend.rpc("session.resume", {"session_id": conv["stored_id"], **({"profile": self.session_profile(conv), "close_on_disconnect": False} if conv["data"].get("bot_profile") else {})})
         stored = result.get("session_key") or result.get("stored_session_id") or conv["stored_id"]
         self.store.save_conversation(conv["id"], conv["profile"], stored, result["session_id"], True, only(result.get("info", {}), "model provider reasoning_effort cwd"))
         return result["session_id"]
@@ -423,7 +434,7 @@ class Service:
                 attached_refs = await self.uploads.attach(conv, sid, run, selected)
                 if attached_refs: text += "\n\n" + "\n".join(attached_refs)
                 self.store.update_run(run["id"], run["state"], prompt=text, attachment_ids=list(attachment_ids))
-                await self.backends[conv["profile"]].rpc("prompt.submit", {"session_id": sid, "text": text, **({"profile": self.session_profile(current)} if current["data"].get("canonical") else {})})
+                await self.backends[conv["profile"]].rpc("prompt.submit", {"session_id": sid, "text": text, **({"profile": self.session_profile(current)} if current["data"].get("bot_profile") else {})})
             except Problem as err:
                 state = "unknown" if err.code in {"upstream_uncertain", "upstream_unavailable"} else "failed"
                 run = self.store.update_run(run["id"], state, reason=err.code)
@@ -437,7 +448,7 @@ class Service:
         backend = self.backends[run["profile"]]
         # Reject stale handles immediately before sending a control.
         conv = self.store.get("conversations", run["conversation_id"])
-        if conv["data"].get("canonical"):
+        if conv["data"].get("bot_profile"):
             conv = await self.refresh_bot_binding(conv, control=True)
             resumed = await backend.rpc("session.resume", {"session_id": conv["stored_id"], "profile": self.session_profile(conv), "omit_messages": True, "close_on_disconnect": False})
             valid = resumed.get("session_id") == run["live_id"] and self.profile_matches(resumed, self.session_profile(conv)) and resumed.get("running")

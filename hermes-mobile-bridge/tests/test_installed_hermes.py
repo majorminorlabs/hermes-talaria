@@ -143,6 +143,13 @@ memory:
                 out = await res.json()
                 assert res.status == expected, out
                 return out
+        # B2 is independent of Hermes and preserves the exact input bytes.
+        capture_id = str(uuid.uuid4())
+        capture_text = "  verbatim *capture*\n\nNo rewriting.\n"
+        capture = await request('POST', '/captures', {'client_capture_id': capture_id, 'created_at': '2026-10-05T15:00:00Z', 'kind': 'note', 'text': capture_text}, 201)
+        repeated = await request('POST', '/captures', {'client_capture_id': capture_id, 'created_at': '2026-10-05T15:00:00Z', 'kind': 'note', 'text': capture_text}, 201)
+        assert capture == repeated
+        assert next((tmp_path / 'bridge-state' / 'captures').rglob('*.md')).read_bytes() == capture_text.encode()
         if cfg['backends']['default']['bot_mode_roster']:
             bots = (await request('GET', '/bots'))['bots']
             assert {b['name'] for b in bots} == {'Hermes', 'Research Orchestrator', 'Research Worker'}
@@ -160,6 +167,20 @@ memory:
             assert service.store.get('conversations',new_chat['id'])['stored_id']
             await request('POST','/bots/'+created['id']+'/hide',{'hidden':False})
             assert (await request('GET','/bots/'+created['id']))['name'] == 'Edited fixture bot'
+            # B1: two independent, persisted native-profile sessions, streamed
+            # against the isolated real Hermes backend and local model fixture.
+            for_thread = next(b for b in bots if b['name'] == 'Research Worker')
+            first = await request('POST', '/bots/' + for_thread['id'] + '/conversations', {}, 201)
+            second = await request('POST', '/bots/' + for_thread['id'] + '/conversations', {}, 201)
+            assert first['id'] != second['id'] and first['is_bot_chat'] is False
+            assert first['bot_id'] == second['bot_id'] == for_thread['id']
+            listing = (await request('GET', '/conversations'))['conversations']
+            assert {first['id'], second['id']} <= {c['id'] for c in listing}
+            for independent in [first, second]:
+                turn = await request('POST', '/conversations/' + independent['id'] + '/runs', {'text': 'Reply with a short safe greeting.'}, 202)
+                await eventually(lambda: service.store.get('runs', turn['id'])['state'] in {'complete','failed'}, timeout=30)
+                assert service.store.get('runs', turn['id'])['state'] == 'complete'
+                assert (await request('GET', '/conversations/' + independent['id']))['messages']
             bot = next(b for b in bots if b['name'] == 'Research Orchestrator')
             detail = await request('GET', '/bots/' + bot['id'])
             assert {v['name'] for v in detail['skills']} == set(SKILLS)
@@ -274,6 +295,21 @@ memory:
             reclaimed = await request('GET', f"/kanban/tasks/{card['id']}")
             assert reclaimed['task']['raw_state'] == 'ready'
             assert reclaimed['attempts'][0]['outcome'] == 'reclaimed'
+            if cfg['backends']['default']['bot_mode_roster']:
+                review_code = "from hermes_cli import kanban_db as kb; from hermes_cli.kanban_db_connect import connect; c=connect(board='default'); assert kb.request_review(c," + repr(card['upstream_id']) + ",summary='Review local evidence',force=True); c.close()"
+                review_args = json.loads(subprocess.check_output([str(python), '-I', '-c', resolver, str(SOURCE), review_code], env=dict(env, HERMES_HOME=str(SOURCE.parent)), text=True))
+                seeded_review = await asyncio.to_thread(subprocess.run, review_args, cwd=SOURCE, env=env, capture_output=True, timeout=30)
+                assert seeded_review.returncode == 0, 'Canonical review setup failed'
+                review_detail = await request('GET', f"/kanban/tasks/{card['id']}")
+                assert {'done','ready','todo'} <= set(review_detail['supported_targets'])
+                listed = await request('GET', '/kanban/tasks')
+                assert 'done' in next(x for x in listed['tasks'] if x['id'] == card['id'])['supported_targets']
+                await request('PATCH', f"/kanban/tasks/{card['id']}", {'status':'ready','summary':'Revise local evidence'})
+                assert any(x['body'] == 'Revise local evidence' for x in (await request('GET', f"/kanban/tasks/{card['id']}"))['comments'])
+                seeded_review = await asyncio.to_thread(subprocess.run, review_args, cwd=SOURCE, env=env, capture_output=True, timeout=30)
+                assert seeded_review.returncode == 0
+                await request('PATCH', f"/kanban/tasks/{card['id']}", {'status':'done','summary':'Evidence checked on Talaria'})
+                assert (await request('GET', f"/kanban/tasks/{card['id']}"))['task']['raw_state'] == 'done'
             await request('POST', f"/kanban/tasks/{card['id']}/reassign", {'profile': ''})
             await request('DELETE', f"/kanban/tasks/{child['id']}", {})
             await request('DELETE', f"/kanban/tasks/{card['id']}", {})

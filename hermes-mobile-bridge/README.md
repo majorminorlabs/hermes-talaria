@@ -64,3 +64,33 @@ SQLite observations and command receipts persist indefinitely; events expire by 
 
 
 Desktop Bot Mode is available through an explicit `bot_mode_roster: true` backend grant. See [source audit and mobile contract](../BOT_MODE_AUDIT.md). This grants read access to all local bots, including newly created bots, to credentials authorized for that source backend; it does not grant control of their Desktop chats.
+
+## vNext Phase 1 additions
+
+`botThreads` enables `POST /mobile/v1/bots/{id}/conversations`. It creates an
+independent native profile session rather than reusing `Bot Chat`. The sessions
+appear in the ordinary conversation list/search with `bot_id`; the existing
+canonical-chat endpoints remain supported. Model/provider/reasoning/workspace
+overrides apply at creation, and an omitted override follows the profile config.
+
+`captures_root` is a dedicated bridge inbox, defaulting to `state_dir/captures`.
+Use an absolute canonical path on private local storage. Its directories are
+0700 and files 0600, owned by the service user; symlinks and hard links are
+rejected. Capture requires `read` and `chat.control`. Dated Markdown files contain
+only the exact captured UTF-8 text; JSON sidecars contain context and attachment
+references. Uploads support validated media and mono M4A (`audio/mp4`), up to
+10 MiB each, four per capture, with a 256 MiB per-device media limit. Text is
+limited to 200 KB. Back up this inbox with the journal; losing the journal loses
+receipt/ownership metadata. Capture creates no task and executes no Hermes turn.
+
+Capture and upload IDs are stable and replay-safe, including recovery after an
+interrupted receipt. Other uncertain mutations remain non-replayable. The new
+read-only `/commands/{id}` endpoint exposes only the authenticated device's
+receipt so Talaria can check an uncertain Ask without sending it again.
+
+Kanban lists now include `supported_targets`. Review supports completion with a
+summary. Send back writes a nonempty note through Hermes's existing comment
+endpoint before the status PATCH: these two upstream writes are not atomic. An
+interrupted command must be checked on the Mac and must not be replayed.
+Dangerous approvals remain Mac-only; optional clarification default/timeout
+metadata passes through only when Hermes actually supplies it.

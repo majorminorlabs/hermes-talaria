@@ -33,6 +33,9 @@ class Stack:
         self.calls = []; self.runners = []
         self.env = {k:v for k,v in os.environ.items() if not any(x in k.upper() for x in ('API_KEY','TOKEN','SECRET','HERMES_','ANTHROPIC_','OPENAI_','OPENROUTER_','NOUS_')) and k not in {'PYTHONPATH','PYTHONHOME'}}
         self.env.update(HERMES_HOME=str(self.home),HERMES_DASHBOARD_SESSION_TOKEN='isolated-dashboard-'+'u'*32,HERMES_TUI_TOOLSETS='terminal,file',PYTHONUNBUFFERED='1')
+        # Optional private dependency overlay; never installs into Hermes's runtime.
+        if dependencies := os.environ.get('HERMES_TEST_DEPENDENCIES'):
+            self.env['PYTHONPATH'] = str(Path(dependencies).resolve(strict=True))
         self.logs = []
 
     def launch(self, which):
@@ -78,7 +81,9 @@ class Stack:
         return web.json_response({'model_requests':len(self.calls),'steering_consumed':any('safe-steering-evidence' in json.dumps(c['messages']) for c in self.calls), 'commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=SOURCE,text=True).strip()})
 
     async def start(self):
-        commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=SOURCE,text=True).strip(); assert commit.startswith('2a4c9afd7bd')
+        commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=SOURCE,text=True).strip()
+        from hermes_mobile_bridge.bots import AUDITED_COMMITS
+        assert any(commit.startswith(c) for c in AUDITED_COMMITS)
         (self.home/'config.yaml').write_text(f'''model:
   default: bridge-local-test
   provider: custom
@@ -98,10 +103,19 @@ memory:
   memory_enabled: false
   user_profile_enabled: false
 ''')
+        if commit == '4bb9e57bfde8a0affb5553eff13ed6e1f14147f1':
+            self.env['HERMES_RUNTIME_DIR'] = str(SOURCE.parent / 'tools')
+            self.env['HERMES_DISABLE_LAZY_INSTALLS'] = '1'
+            for name,title in [('research-orchestrator','Research Orchestrator'),('research-worker','Research Worker')]:
+                profile = self.home / 'profiles' / name
+                profile.mkdir(parents=True)
+                (profile / 'config.yaml').write_text((self.home / 'config.yaml').read_text())
+                (profile / 'profile.yaml').write_text('display_name: ' + title + '\nui_meta:\n  hermes-bots:\n    title: ' + title + '\n')
+                (profile / 'SOUL.md').write_text('Isolated mobile integration fixture. Reply briefly; only safe fixture work.')
         token_file=self.directory/'upstream-token';token_file.write_text(self.env['HERMES_DASHBOARD_SESSION_TOKEN'])
         state=self.directory/'state'
         store=Store({'state_dir':str(state)},lock=False);_,self.token=store.token('simulator',['read','chat.control','tasks.manage','approvals.respond'],['default']);store.close()
-        cfg={'state_dir':str(state),'listen_port':self.bp,'backends':{'default':{'url':f'http://127.0.0.1:{self.hp}','token_file':str(token_file),'source_dir':str(SOURCE),'boards':['default'],'workspaces':{'test':str(self.work)},'artifact_roots':[str(self.work/'.hermes/desktop-attachments')]}}}
+        cfg={'state_dir':str(state),'listen_port':self.bp,'backends':{'default':{'url':f'http://127.0.0.1:{self.hp}','token_file':str(token_file),'source_dir':str(SOURCE),'boards':['default'],'workspaces':{'test':str(self.work)},'artifact_roots':[str(self.work/'.hermes/desktop-attachments')], 'bot_mode_roster': commit == '4bb9e57bfde8a0affb5553eff13ed6e1f14147f1', 'bot_chat_control':True, 'installed_commit':commit}}}
         (self.directory/'bridge.json').write_text(json.dumps(cfg))
         modelapp=web.Application();modelapp.router.add_post('/v1/chat/completions',self.model);modelapp.router.add_get('/v1/models',lambda r:web.json_response({'data':[{'id':'bridge-local-test'}]}))
         control=web.Application();control.router.add_post('/restart/{which:hermes|bridge}',self.control);control.router.add_get('/evidence',self.control)
