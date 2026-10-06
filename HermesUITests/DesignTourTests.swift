@@ -21,8 +21,8 @@ final class DesignTourTests: XCTestCase {
         app.tabBars.buttons["Threads"].tap(); shot("design-threads", app)
         app.tabBars.buttons["Agents"].tap(); shot("design-agents", app)
         app.buttons["Create Agent"].tap(); XCTAssertTrue(app.textFields["bot-name"].waitForExistence(timeout:5)); shot("design-agent-editor", app); app.buttons["Cancel"].firstMatch.tap()
-        app.buttons["capture-button"].tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForExistence(timeout:5)); shot("design-capture", app); app.buttons["Close"].firstMatch.tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForNonExistence(timeout:5))
-        app.buttons["ask-bar"].tap(); XCTAssertTrue(app.navigationBars["Ask"].waitForExistence(timeout:5)); shot("design-ask", app)
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap(); app.buttons["capture-button"].tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForExistence(timeout:5)); shot("design-capture", app); app.buttons["Close"].firstMatch.tap(); XCTAssertTrue(app.navigationBars["Capture"].waitForNonExistence(timeout:5))
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap(); XCTAssertTrue(app.navigationBars["Ask"].waitForExistence(timeout:5)); shot("design-ask", app)
     }
 
     func testLargeDynamicType() throws {
@@ -30,8 +30,9 @@ final class DesignTourTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10)); shot("large-now",app)
         app.tabBars.buttons["Threads"].tap(); shot("large-threads",app)
         app.tabBars.buttons["Agents"].tap(); shot("large-agents",app)
-        XCTAssertTrue(app.buttons["ask-bar"].exists)
-        app.buttons["ask-bar"].tap(); XCTAssertTrue(app.buttons["ask-send"].waitForExistence(timeout:5)); shot("large-ask",app)
+        app.tabBars.buttons["Now"].tap()
+        XCTAssertTrue(app.buttons["ask-toolbar"].exists)
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap(); XCTAssertTrue(app.buttons["ask-send"].waitForExistence(timeout:5)); shot("large-ask",app)
     }
     private func launch(_ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()

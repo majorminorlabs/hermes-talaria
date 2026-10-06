@@ -30,10 +30,10 @@ final class ScreenTourTests: XCTestCase {
         tab("Threads"); settle(); shot("10-threads")
         if tapText("Researcher") { settle(); shot("11-thread-working"); if app.buttons["steps-button"].firstMatch.exists { app.buttons["steps-button"].firstMatch.tap(); settle(); shot("12-steps"); app.buttons["Done"].firstMatch.tap() }; back() }
         if tapText("This week in agent research") { settle(); shot("13-markdown-artifacts"); back() }
-        app.buttons["ask-bar"].tap(); settle(); shot("16-ask"); app.buttons["Close"].firstMatch.tap()
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap(); settle(); shot("16-ask"); app.buttons["Close"].firstMatch.tap()
         tab("Agents"); settle(); shot("30-agents")
         if tapText("Caddy") { settle(); shot("31-agent"); app.swipeUp(); shot("32-agent-runtime"); back() }
-        tab("Now"); app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Studio connection' ")).firstMatch.tap(); settle(); shot("40-studio")
+        tab("Now"); app.buttons["talaria-settings"].tap(); settle(); shot("40-studio")
         if tapText("Settings") { settle(); shot("41-settings"); back() }
         if tapText("Skills") { settle(); shot("42-skills"); back() }
     }

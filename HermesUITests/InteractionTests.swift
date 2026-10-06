@@ -18,13 +18,13 @@ final class InteractionTests: XCTestCase {
     private func row(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@",title)).firstMatch }
     private func reveal(_ element: XCUIElement) { for _ in 0..<6 where !element.exists || !element.isHittable { app.swipeUp() }; XCTAssertTrue(element.waitForExistence(timeout:5)) }
     private func openAsk(_ words: String) {
-        app.buttons["ask-bar"].tap(); let field = text("ask-text"); XCTAssertTrue(field.waitForExistence(timeout:5)); if !words.isEmpty { field.tap(); field.typeText(words) }
+        app.buttons["ask-toolbar"].tap(); let field = text("ask-text"); XCTAssertTrue(field.waitForExistence(timeout:5)); if !words.isEmpty { field.tap(); field.typeText(words) }
     }
     func testNowEmptyStateAndThreeTabs() {
         launch(["-emptyData", "YES"])
         XCTAssertTrue(app.staticTexts["Nothing needs you. Hermes is idle."].waitForExistence(timeout:10))
         XCTAssertEqual(app.tabBars.buttons.count,3)
-        XCTAssertTrue(app.buttons["ask-bar"].exists)
+        XCTAssertTrue(app.buttons["ask-toolbar"].exists)
     }
     func testClarificationAnswerAndMacOnlyApproval() {
         launch()
@@ -38,7 +38,7 @@ final class InteractionTests: XCTestCase {
     }
     func testAskHermesAndExplicitAgentCreateSeparateThreads() {
         launch(); openAsk("Hello Hermes"); app.buttons["ask-send"].tap()
-        XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:10))
         tab("Agents")
         let agent = app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Research Worker' ")).firstMatch
         XCTAssertTrue(agent.waitForExistence(timeout:10)); agent.tap()
@@ -62,15 +62,15 @@ final class InteractionTests: XCTestCase {
     }
     func testOfflineAskIsSavedWithoutExecution() {
         launch(["-simulate", "bridgeOffline"]); openAsk("Do not execute automatically")
-        app.buttons["ask-send"].tap(); XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:5))
+        app.buttons["ask-send"].tap(); XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'asks not sent'")).firstMatch.waitForExistence(timeout:5))
         app.terminate(); app.launchArguments = ["-uiTesting", "-runSpeed", "0.2"]; app.launch()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'asks not sent'")).firstMatch.waitForExistence(timeout:10))
     }
     func testOfflineCaptureSyncsAfterRelaunchReconnect() {
-        launch(["-simulate", "bridgeOffline"]); app.buttons["capture-button"].tap()
+        launch(["-simulate", "bridgeOffline"]); app.buttons["ask-toolbar"].tap(); app.buttons["capture-button"].tap()
         let field = text("capture-text"); XCTAssertTrue(field.waitForExistence(timeout:5)); field.tap(); field.typeText("  Verbatim capture\nSecond line")
-        app.buttons["capture-save"].tap(); XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:5))
+        app.buttons["capture-save"].tap(); XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'captures waiting'")).firstMatch.exists)
         app.terminate(); app.launchArguments = ["-uiTesting"]; app.launch()
         XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10))
@@ -99,30 +99,31 @@ final class InteractionTests: XCTestCase {
     }
     func testAccessoryPushToTalkCancelSendsNothing() {
         launch()
-        let ask = app.buttons["ask-bar"]
+        let ask = app.buttons["ask-toolbar"]
         let start = app.coordinate(withNormalizedOffset:CGVector(dx:0,dy:0)).withOffset(CGVector(dx:ask.frame.midX,dy:ask.frame.midY))
         start.press(forDuration:0.8,thenDragTo:start.withOffset(CGVector(dx:-140,dy:0)))
-        XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:5))
         XCTAssertFalse(app.buttons["ask-send"].exists)
         XCTAssertFalse(app.buttons["Stop dictation"].exists)
     }
-    func testAccessoryPushToTalkLocksUntilStopped() {
+    func testToolbarPushToTalkReleasesAndSends() {
         launch(["-vnext.reviewVoiceBeforeSending", "YES"])
-        let ask = app.buttons["ask-bar"]
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx:0,dy:0)).withOffset(CGVector(dx:ask.frame.midX,dy:ask.frame.midY))
-        start.press(forDuration:0.8, thenDragTo:start.withOffset(CGVector(dx:0,dy:-120)))
-        XCTAssertTrue(app.staticTexts["Locked"].waitForExistence(timeout:5))
-        let stop = app.buttons["Stop dictation"]; XCTAssertTrue(stop.isHittable); stop.tap()
-        XCTAssertTrue(app.buttons["ask-send"].waitForExistence(timeout:5))
-        let cancel = app.buttons["Cancel"].firstMatch; reveal(cancel); cancel.tap()
-        XCTAssertFalse(app.buttons["ask-send"].isEnabled)
+        app.buttons["ask-toolbar"].press(forDuration:2.0)
+        XCTAssertTrue(app.staticTexts["Handed to Hermes"].waitForExistence(timeout:10))
+        XCTAssertFalse(app.buttons["ask-send"].exists)
+        tab("Threads")
+        XCTAssertTrue(row("Summarize the current work").waitForExistence(timeout:10))
     }
-    func testAccessoryPushToTalkReleasesToReview() {
-        launch(["-vnext.reviewVoiceBeforeSending", "YES"]); app.buttons["ask-bar"].press(forDuration:2.0)
-        XCTAssertTrue(app.buttons["ask-send"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["Send"].firstMatch.waitForExistence(timeout:2))
-        let cancel = app.buttons["Cancel"].firstMatch; reveal(cancel); cancel.tap()
-        XCTAssertFalse(app.buttons["ask-send"].isEnabled)
+    func testUniformSettingsAndNoBottomAsk() {
+        launch()
+        for title in ["Now", "Threads", "Agents"] {
+            tab(title)
+            XCTAssertTrue(app.buttons["talaria-settings"].exists)
+            XCTAssertFalse(app.buttons["ask-bar"].exists)
+            app.buttons["talaria-settings"].tap()
+            XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout:5))
+            app.navigationBars.buttons.element(boundBy:0).tap()
+        }
     }
     func testPushToTalkSlideLeftCancelSendsNothing() {
         launch(); openAsk("")

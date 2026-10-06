@@ -1,12 +1,11 @@
 import SwiftUI
 
 struct ConnectionChip: View {
-    @Environment(ConnectionStore.self) private var connection
     var body: some View {
         NavigationLink(value: Route.studio) {
-            Label(connection.activeHost?.name ?? "Pair a Mac", systemImage: connection.connection.isConnected ? "circle.fill" : "wifi.slash")
-                .font(.caption).foregroundStyle(connection.connection.isConnected ? Theme.success : .secondary)
-        }.accessibilityLabel("Studio connection. \(connection.connection.label(host: connection.activeHost?.name ?? "Mac"))")
+            Image("TalariaMark").resizable().scaledToFit().frame(width: 26, height: 26)
+                .frame(width: 44, height: 44)
+        }.accessibilityLabel("Talaria settings and Studio").accessibilityIdentifier("talaria-settings")
     }
 }
 struct WorkItemRow: View {
@@ -100,7 +99,10 @@ struct NowView: View {
         }
         .sheet(item: $risk) { RiskConfirmSheet(action: $0) }
         .navigationTitle("Now")
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ConnectionChip() } }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { ConnectionChip() }
+            ToolbarItem(placement: .topBarTrailing) { AskToolbarButton() }
+        }
         .refreshable { await environment.refreshAll() }
     }
     private func focusNeeds(using proxy: ScrollViewProxy) {
@@ -167,6 +169,7 @@ struct ThreadsView: View {
         }
         .searchScopes($scope) { ForEach(["All", "Active", "Needs You", "Unread"], id: \.self) { Text($0).tag($0) } }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { ConnectionChip() }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Toggle("Show Archived", isOn: $archived)

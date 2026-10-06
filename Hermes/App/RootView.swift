@@ -51,42 +51,26 @@ struct RootView: View {
         liveActivity.update(runs: environment.activity.runs.values.sorted { $0.id < $1.id }, profiles: environment.profiles, connected: connection.connection.isConnected)
     }
 
-    private var accessoryVisible: Bool {
-        let path = router.selectedTab == .now ? router.nowPath : router.selectedTab == .threads ? router.threadsPath : router.agentsPath
-        switch path.last { case .thread, .conversation, .newConversation, .run: return false; default: return true }
-    }
     @ViewBuilder private var shell: some View {
-        if #available(iOS 26.1, *) {
-            tabs(fallback: false)
-                .tabViewBottomAccessory(isEnabled: accessoryVisible) { AskBar() }
-                .tabBarMinimizeBehavior(.onScrollDown)
-        } else if #available(iOS 26.0, *) {
-            tabs(fallback: false).tabViewBottomAccessory { if accessoryVisible { AskBar() } }.tabBarMinimizeBehavior(.onScrollDown)
-        } else { tabs(fallback: true) }
+        if #available(iOS 26.0, *) { tabs().tabBarMinimizeBehavior(.onScrollDown) }
+        else { tabs() }
     }
-    private func tabs(fallback: Bool) -> some View {
+    private func tabs() -> some View {
         @Bindable var router = router
         return TabView(selection: $router.selectedTab) {
             Tab("Now", systemImage: "circle.dotted.circle", value: AppTab.now) {
-                NavigationStack(path: router.path(for: .now)) { NowView().askInset(enabled: fallback).routeDestinations() }
+                NavigationStack(path: router.path(for: .now)) { NowView().routeDestinations() }
             }.badge(environment.needsYou.actionableCount)
             Tab("Threads", systemImage: "bubble.left.and.text.bubble.right", value: AppTab.threads) {
-                NavigationStack(path: router.path(for: .threads)) { ThreadsView().askInset(enabled: fallback).routeDestinations() }
+                NavigationStack(path: router.path(for: .threads)) { ThreadsView().routeDestinations() }
             }
             Tab("Agents", systemImage: "person.2", value: AppTab.agents) {
-                NavigationStack(path: router.path(for: .agents)) { BotsView().askInset(enabled: fallback).routeDestinations() }
+                NavigationStack(path: router.path(for: .agents)) { BotsView().routeDestinations() }
             }
         }
     }
 }
-extension View {
-    @ViewBuilder func askInset(enabled: Bool) -> some View {
-        if enabled { safeAreaInset(edge: .bottom, spacing: 0) { AskBar().background(.bar) } }
-        else { self }
-    }
-}
-
-/// Keep recording updates out of the native accessory host's view identity.
+/// Recording feedback shared by the toolbar and composer.
 private struct HeldVoiceOverlay: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(AppRouter.self) private var router
@@ -103,9 +87,15 @@ private struct HeldVoiceOverlay: View {
         .onChange(of: environment.voice.phase) { _, phase in
             guard router.heldVoiceAsk != nil || router.heldVoiceCapture else { return }
             if phase == .review {
-                if router.heldVoiceCapture { router.captureSeed = CaptureSeed(voice: true) }
-                else { router.askSeed = router.heldVoiceAsk }
-                router.heldVoiceAsk = nil; router.heldVoiceCapture = false
+                if router.heldVoiceCapture {
+                    router.captureSeed = CaptureSeed(voice: true)
+                    router.heldVoiceCapture = false
+                } else if let seed = router.heldVoiceAsk {
+                    let text = environment.voice.transcript
+                    router.heldVoiceAsk = nil
+                    environment.voice.reset()
+                    Task { await environment.sendHeldVoiceAsk(text: text, seed: seed) }
+                }
             } else if phase == .cancelled || phase == .idle {
                 router.heldVoiceAsk = nil; router.heldVoiceCapture = false
             }

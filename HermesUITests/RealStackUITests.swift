@@ -11,8 +11,8 @@ final class RealStackUITests: XCTestCase {
         let app=XCUIApplication()
         app.launch()
         XCTAssertTrue(app.navigationBars["Now"].waitForExistence(timeout:10))
-        XCTAssertTrue(app.buttons["ask-bar"].waitForExistence(timeout:20))
-        app.buttons["ask-bar"].tap()
+        XCTAssertTrue(app.buttons["ask-toolbar"].waitForExistence(timeout:20))
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap()
         let composer = app.textFields["ask-text"]
         XCTAssertTrue(composer.waitForExistence(timeout:5)); composer.tap(); composer.typeText("Safe local UI hello")
         app.buttons["ask-send"].tap()
@@ -29,14 +29,13 @@ final class RealStackUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Open"].waitForExistence(timeout:5)); app.buttons["Open"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Local Studio stream complete'")).firstMatch.waitForExistence(timeout:20))
         app.navigationBars.buttons.element(boundBy:0).tap()
-        app.buttons["capture-button"].tap()
+        app.tabBars.buttons["Now"].tap(); app.buttons["ask-toolbar"].tap(); app.buttons["capture-button"].tap()
         let capture = app.textFields["capture-text"]
         XCTAssertTrue(capture.waitForExistence(timeout:5)); capture.tap(); capture.typeText("  Production UI *capture*\nKeep exact text  ")
         app.buttons["capture-save"].tap()
         XCTAssertTrue(app.staticTexts["Saved to Hermes"].waitForExistence(timeout:10))
-        app.navigationBars.buttons.element(boundBy:0).tap()
         app.tabBars.buttons["Now"].tap()
-        app.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Studio connection' ")).firstMatch.tap()
+        app.buttons["talaria-settings"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout:5))
 
     }

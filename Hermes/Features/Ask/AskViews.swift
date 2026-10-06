@@ -2,24 +2,52 @@ import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
 
-struct AskBar: View {
+struct AskToolbarButton: View {
     @Environment(AppEnvironment.self) private var environment
     var body: some View {
-        HStack(spacing: 8) {
-            Button { environment.router.captureSeed = CaptureSeed() } label: { Image(systemName: "tray.and.arrow.down").frame(width: 44, height: 44) }
-                .accessibilityLabel("Capture").accessibilityIdentifier("capture-button").accessibilityAction(named: "Start voice capture") { beginVoice(capture: true) }
-                .modifier(PushToTalk(start: { beginVoice(capture: true) }, move: environment.voice.move, release: environment.voice.release, tap: { environment.router.captureSeed = CaptureSeed() }))
-            Button { environment.router.askSeed = AskSeed() } label: {
-                HStack { Text("Auto").font(.caption); Text(environment.connection.connection.isConnected ? "Ask Hermes…" : "Ask · Offline").lineLimit(1); Spacer(); Image(systemName: "mic") }.frame(minHeight: 44)
-            }.buttonStyle(.plain)
-                .accessibilityIdentifier("ask-bar").accessibilityLabel("Ask Hermes").accessibilityAction(named: "Start voice ask") { beginVoice(capture: false) }
-                .modifier(PushToTalk(start: { beginVoice(capture: false) }, move: environment.voice.move, release: environment.voice.release, tap: { environment.router.askSeed = AskSeed() }))
-        }.padding(.horizontal, 8).padding(.vertical, 4)
+        Button { environment.router.askSeed = AskSeed() } label: {
+            Image(systemName: "mic").frame(width: 44, height: 44)
+        }.accessibilityLabel("Ask Hermes. Tap to compose, hold to speak and release to send.")
+            .accessibilityIdentifier("ask-toolbar")
+            .accessibilityAction(named: "Start voice ask") { environment.beginHeldVoice(capture: false) }
+            .modifier(PushToTalk(start: { environment.beginHeldVoice(capture: false) }, move: environment.voice.move, release: environment.voice.release, tap: { environment.router.askSeed = AskSeed() }))
     }
-    private func beginVoice(capture: Bool) {
-        environment.voice.start(capture: capture, simulated: environment.simulator != nil)
-        if capture { environment.router.heldVoiceCapture = true }
-        else { environment.router.heldVoiceAsk = AskSeed(voice: true) }
+}
+
+extension AppEnvironment {
+    func beginHeldVoice(capture: Bool) {
+        voice.start(capture: capture, simulated: simulator != nil)
+        if capture { router.heldVoiceCapture = true }
+        else { router.heldVoiceAsk = AskSeed(voice: true) }
+    }
+
+    /// Releasing the held Ask is authorization to send now. Ambiguous targets
+    /// and offline drafts stay in the composer; they never send later on reconnect.
+    func sendHeldVoiceAsk(text: String, seed: AskSeed) async {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let choices = preferences.defaults.dictionary(forKey: "vnext.alias.\(connection.activeHostID)") as? [String:String] ?? [:]
+        let route = AskRouter.resolve(text: text, explicit: seed.agentID, agents: profiles.sorted, aliasChoices: choices)
+        guard !route.isAmbiguous, connection.connection.isConnected else {
+            var draft = seed; draft.text = text; draft.voice = false
+            router.askSeed = draft
+            return
+        }
+        let config = RunConfiguration(profileID: route.agentID, model: seed.model, reasoning: preferences.defaultReasoning, hostID: connection.activeHostID)
+        let ask = OutboxAsk(hostID: config.hostID, text: text, configuration: config)
+        do {
+            try outbox.enqueue(ask)
+            let thread = try await outbox.sendAsk(ask.id, environment: self)
+            toasts.show("Handed to \(profiles.name(route.agentID))", actionTitle: "Open") { self.router.open(.thread(thread)) }
+            UIAccessibility.post(notification: .announcement, argument: "Sent to \(profiles.name(route.agentID))")
+        } catch {
+            if outbox.asks.contains(where: { $0.id == ask.id }) {
+                toasts.show("Voice Ask wasn't confirmed. Check Outbox before sending again.", symbol: "questionmark.circle")
+            } else {
+                var draft = seed; draft.text = text; draft.voice = false
+                router.askSeed = draft
+                toasts.show("Couldn't save Voice Ask. Your transcript is in the composer.", symbol: "exclamationmark.triangle")
+            }
+        }
     }
 }
 struct RouteChip: View {
@@ -80,6 +108,10 @@ struct AskSheet: View {
                     if options { optionsView }
                     TextField("Ask Hermes…", text: $text, axis: .vertical).lineLimit(3...12).focused($focused).disabled(sending)
                         .accessibilityIdentifier("ask-text")
+                    Button("Capture", systemImage: "tray.and.arrow.down") {
+                        environment.router.askSeed = nil
+                        environment.router.captureSeed = CaptureSeed(text: text)
+                    }.accessibilityIdentifier("capture-button")
                     MediaPicker(media: $media)
                     if let error { Text(error).font(.footnote).foregroundStyle(Theme.failure) }
                     HStack {
