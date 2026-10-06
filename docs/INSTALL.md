@@ -38,7 +38,7 @@ Paid membership is optional for personal-device testing. Follow
 ### Option B: SideStore
 
 Install official SideStore, configure LocalDevVPN and import the
-[published IPA](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0).
+[published IPA](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0).
 Leave normal App-ID customization/suffix behavior enabled. A resigned identity
 such as `xyz.majorminor.talaria.<YOUR TEAM ID>` is expected. Follow the
 [SideStore user guide](SIDESTORE_USER_GUIDE.md), then pair with the same bridge.
@@ -47,8 +47,8 @@ such as `xyz.majorminor.talaria.<YOUR TEAM ID>` is expected. Follow the
 Talaria ↔ Hermes bridge connectivity.** Turn LocalDevVPN off and Tailscale back
 on before using Talaria. Xcode installs do not require LocalDevVPN.
 
-The published IPA remains **0.1.0** with the earlier interface. Current **0.2.0**
-features require building source with Xcode; no new IPA is published in this update.
+The published IPA is **0.2.0 / build 2**, with the embedded Live Activity extension.
+Keep your installed identity and Team stable when upgrading.
 
 ## Mac bridge setup
 

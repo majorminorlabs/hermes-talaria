@@ -1,12 +1,11 @@
-> This guide installs the older v0.1.0 download. Current 0.2.0 features require
-> an [Xcode source build](XCODE_INSTALL.md); no new IPA is published in this update.
-> Current pairing is Studio → Hosts; the v0.1.0 IPA uses More → Saved Hosts.
+> This guide installs the unsigned v0.2.0 download. Pair through Studio → Saved Hosts.
+> The current physical acceptance used Xcode; SideStore expiry/refresh limitations below remain.
 
 # Talaria with official SideStore
 
 Talaria is MAJOR//MINOR's native iPhone companion for the Hermes backend on your
 Mac. Its canonical public unsigned IPA bundle ID is `xyz.majorminor.talaria`;
-version 0.1.0, build 1. This is the alternative to
+version 0.2.0, build 2. This is the alternative to
 [building/installing with Xcode](XCODE_INSTALL.md), not a requirement for Talaria.
 Paid Apple Developer Program membership is not required for this free-account path.
 
@@ -49,6 +48,10 @@ Refresh All, is recorded separately in the
 Release-preparation reports describe their original snapshot, before the later
 public-ID phone validation above; the published v0.1.0 artifacts are unchanged.
 
+Current 0.2.0 Xcode upgrade and device acceptance are recorded in
+[physical acceptance](PHYSICAL_ACCEPTANCE_v0.2.0.md). They do not certify new
+SideStore account signing, expiry or refresh behavior.
+
 ## New user: install, pair, chat and Refresh
 
 First prepare the awake, logged-in Mac's Hermes bridge and private Tailscale HTTPS
@@ -66,9 +69,9 @@ passcode, your own Apple Account and Tailscale access to your Mac.
    SideStore itself once. Leave **Settings → User Customizations → Customize AppID**
    off. A free account has a seven-day signing window and app/App-ID limits; check
    the [FAQ](https://docs.sidestore.io/docs/faq) before adding other apps.
-3. **Get and verify the Talaria IPA.** Download `Talaria-v0.1.0.ipa` and the
-   [release](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0)'s
-   `SHA256SUMS.txt`; compare the IPA's `shasum -a 256 Talaria-v0.1.0.ipa` output
+3. **Get and verify the Talaria IPA.** Download `Talaria-v0.2.0.ipa` and the
+   [release](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0)'s
+   `SHA256SUMS.txt`; compare the IPA's `shasum -a 256 Talaria-v0.2.0.ipa` output
    with its entry in that file on your Mac. The unsigned archive
    has the public base ID and no provisioning profile or personal certificate.
    Transfer it through a trusted method that makes it available to SideStore.
@@ -85,13 +88,14 @@ passcode, your own Apple Account and Tailscale access to your Mac.
    identity repeatedly as a troubleshooting shortcut.
 6. **Switch to Tailscale.** Turn LocalDevVPN off, then turn Tailscale on.
    Confirm it reaches the same tailnet as your Mac before opening Talaria.
-7. **Pair with your own bridge.** In **Talaria → More → Saved Hosts → Add Host**, enter
+7. **Pair with your own bridge.** In **Talaria → Studio → Saved Hosts → Add Host**, enter
    the HTTPS URL printed by your Mac's setup helper and your own mobile bridge
    token. The token is stored in the phone's device-only Keychain. Hermes/provider
    credentials stay on your Mac; SideStore does not provide the bridge connection.
-8. **Verify chat.** Confirm Home reports the host connected, open Chat, send a
-   short request and wait for a fresh streamed reply. Check Bots, an existing bot
-   chat, expected history and Tasks; force quit/relaunch and verify reconnect.
+8. **Verify chat.** Confirm Studio reports the host connected, open global Ask, send a
+   short request and wait for a fresh streamed reply. Check Agents and Threads,
+   create two independent threads for one Agent, and verify each history. Force
+   quit/relaunch and verify reconnect.
    A health badge alone is insufficient.
 9. **Verify Refresh.** Turn Tailscale off and LocalDevVPN on while on Wi-Fi.
    Open SideStore and tap Talaria's days badge to Refresh. Check its renewed signing

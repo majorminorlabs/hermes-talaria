@@ -5,9 +5,9 @@ supports [Xcode](docs/XCODE_INSTALL.md) and [SideStore](docs/SIDESTORE_USER_GUID
 later public-ID phone validation is recorded in [release readiness](docs/RELEASE_READINESS.md).
 The published v0.1.0 release artifacts remain unchanged.
 
-## 0.2.0 — source update (2026-10-06)
+## 0.2.0 — binary release (2026-10-06)
 
-This entry describes current source, not a new downloadable IPA or GitHub Release.
+The v0.2.0 release includes an unsigned IPA, device archive and bridge package.
 The existing v0.1.0 tag and artifacts remain unchanged. App/bridge version is 0.2.0;
 app and Live Activity build number is 2, with the public bundle identity preserved.
 
@@ -53,8 +53,8 @@ locally. iOS 18 deployment target and both installation paths remain. The Live
 Activity extension derives its ID from TALARIA_APP_BUNDLE_ID; select your own Team
 for both targets. No APNs/background guarantee, mid-thread model switching, Agent
 pause/reasoning defaults, structured decisions, tracked delegation or TTS. Review
-notes plus transitions are non-atomic. New physical voice/Live Activity and iOS 18
-runtime validation remain pending. Historical physical reports do not certify 0.2.0.
+notes plus transitions are non-atomic. Current physical acceptance passed, including owner-confirmed voice and camera.
+iOS 18 runtime remains unverified. See [acceptance](docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
 ## 0.1.0 — published prerelease (2026-10-05)
 

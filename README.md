@@ -9,10 +9,9 @@ through a private authenticated bridge. Hermes owns the runtime and history.
 [Install](docs/INSTALL.md) · [Use Talaria](docs/USING_TALARIA.md)
 · [What changed](CHANGELOG.md) · [MAJOR//MINOR article](https://majorminor.xyz/releases/talaria)
 
-**Current source: 0.2.0 / build 2.** The downloadable
-[v0.1.0 prerelease](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.1.0)
-is the older interface. Build current source with Xcode for the features below;
-no 0.2.0 IPA or GitHub Release has been published.
+**Current release: 0.2.0 / build 2.** Download the unsigned IPA and bridge package
+from [v0.2.0](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0),
+or build source with Xcode. See the [physical acceptance record](docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
 <img src="docs/images/now.png" alt="Now with synthetic Needs You work" width="240"> <img src="docs/images/agents.png" alt="Agents with synthetic work and runtime models" width="240">
 
@@ -69,7 +68,7 @@ See [privacy and security](docs/PRIVACY_SECURITY.md).
 
 Follow [installation and pairing](docs/INSTALL.md). [Xcode](docs/XCODE_INSTALL.md)
 installs current source. [SideStore](docs/SIDESTORE_USER_GUIDE.md) can install the
-older published IPA; keep its normal Team-ID suffix and refresh free signing
+published 0.2.0 IPA; keep its normal Team-ID suffix and refresh free signing
 before seven-day expiry. LocalDevVPN serves SideStore signing; restore Tailscale
 for normal use. Keep the installed ID and Team stable for updates.
 
@@ -84,8 +83,7 @@ technical names **Hermes**. The bridge targets audited Hermes commit
 
 No APNs delivery or guaranteed monitoring while iOS suspends Talaria. Live Activity
 updates depend on the app running and become stale; they do not keep the bridge
-connection alive. iOS 18 runtime and new physical voice/Live Activity checks remain
-pending. There is no mid-thread model switching, Agent pause/reasoning-default
+connection alive. Physical 0.2.0 acceptance passed; iOS 18 runtime remains unverified. There is no mid-thread model switching, Agent pause/reasoning-default
 control, structured decision system, tracked delegation, TTS or widgets beyond the
 Live Activity extension. Review-note plus task transition uses two upstream operations.
 

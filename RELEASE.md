@@ -3,13 +3,15 @@
 Current source is **0.2.0 / build 2**, including the app, Live Activity extension and
 bridge. Canonical app ID is `xyz.majorminor.talaria`; the extension derives
 `<app ID>.LiveActivity`. Personal Team/signing belongs in ignored local configuration.
-The existing **v0.1.0 prerelease** and its artifacts remain unchanged. This source
-update does not create/replace a tag, GitHub Release or downloadable 0.2.0 IPA.
+The existing **v0.1.0 prerelease** and its artifacts remain unchanged.
+The **v0.2.0 prerelease** includes an unsigned IPA, archive ZIP, bridge package
+and checksums after [physical acceptance](docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
 ## Build and verify
 
 ```sh
-scripts/build-ios-release.sh --output-dir build/release/v0.2.0
+scripts/build-ios-release.sh --output-dir build/release/v0.2.0 \
+  --sidestore-ipa --physical-validation-report docs/PHYSICAL_ACCEPTANCE_v0.2.0.md
 python3 scripts/test_release_artifacts.py -v
 python3 scripts/audit-release-artifacts.py \
   build/release/v0.2.0/Talaria-v0.2.0.xcarchive \
@@ -26,8 +28,8 @@ The optional `--sidestore-ipa --physical-validation-report PATH` gate requires t
 exact `physical_device_validation: PASS`,
 `validation_bundle_identifier: xyz.majorminor.talaria` and
 `validation_version: 0.2.0` markers. **Do not reuse the old 0.1.0 report
-as acceptance for 0.2.0.** Current physical Voice/Live Activity/install/refresh checks
-are pending. The marker is human evidence, not a cryptographic device attestation.
+as acceptance for 0.2.0.** Current Xcode installation, voice, camera and Live Activity
+acceptance passed; untested SideStore refresh/expiry cases remain documented. The marker is human evidence, not a cryptographic device attestation.
 After current acceptance, the same command packages an unsigned Payload/Hermes.app
 for SideStore signing and writes SHA256SUMS.txt. Signed artifacts stay outside Git.
 
@@ -43,5 +45,5 @@ separate app identity and matching extension. Do not override PRODUCT_BUNDLE_IDE
 globally: that would give the app and extension the same ID.
 
 Review [current readiness](docs/RELEASE_READINESS.md), [changelog](CHANGELOG.md) and
-[privacy](docs/PRIVACY_SECURITY.md). Publishing a formal 0.2.0 Release requires a
-separate owner decision and current physical acceptance; release scripts publish nothing.
+[privacy](docs/PRIVACY_SECURITY.md). Publication was authorized by the owner after current physical acceptance;
+release scripts themselves publish nothing.

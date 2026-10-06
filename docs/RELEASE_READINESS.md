@@ -1,3 +1,6 @@
+> The source-update preparation below is historical. Current 0.2.0 binary release
+> acceptance and remaining limits are in [physical acceptance](PHYSICAL_ACCEPTANCE_v0.2.0.md).
+
 # Talaria 0.2.0 source update readiness
 
 Prepared 2026-10-06 against public main `d24c1b4` and the existing v0.1.0 prerelease.
