@@ -23,6 +23,7 @@ final class InteractionTests: XCTestCase {
     func testNowEmptyStateAndThreeTabs() {
         launch(["-emptyData", "YES"])
         XCTAssertTrue(app.staticTexts["Nothing needs you. Hermes is idle."].waitForExistence(timeout:10))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Nothing needs you")).count, 1)
         XCTAssertEqual(app.tabBars.buttons.count,3)
         XCTAssertTrue(app.buttons["ask-toolbar"].exists)
     }
@@ -35,6 +36,12 @@ final class InteractionTests: XCTestCase {
         tab("Threads"); row("Caddy").tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Approve on your Mac'")).firstMatch.waitForExistence(timeout:5))
         XCTAssertFalse(app.buttons["Approve Once"].exists)
+        let approvalCard = element("needs-you-card-a-rm")
+        let composer = app.textFields["Hermes is waiting…"]
+        XCTAssertTrue(approvalCard.waitForExistence(timeout:5))
+        XCTAssertTrue(composer.waitForExistence(timeout:5))
+        XCTAssertLessThanOrEqual(approvalCard.frame.maxY, composer.frame.minY,
+                                 "The pinned approval card must sit above the composer.")
     }
     func testAskHermesAndExplicitAgentCreateSeparateThreads() {
         launch(); openAsk("Hello Hermes"); app.buttons["ask-send"].tap()

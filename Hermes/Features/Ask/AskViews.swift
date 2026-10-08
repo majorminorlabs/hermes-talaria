@@ -4,18 +4,21 @@ import UniformTypeIdentifiers
 
 struct AskToolbarButton: View {
     @Environment(AppEnvironment.self) private var environment
+    @State private var frame: CGRect?
     var body: some View {
         Button { environment.router.askSeed = AskSeed() } label: {
             Image(systemName: "mic").frame(width: 44, height: 44)
         }.accessibilityLabel("Ask Hermes. Tap to compose, hold to speak and release to send.")
             .accessibilityIdentifier("ask-toolbar")
-            .accessibilityAction(named: "Start voice ask") { environment.beginHeldVoice(capture: false) }
-            .modifier(PushToTalk(start: { environment.beginHeldVoice(capture: false) }, move: environment.voice.move, release: environment.voice.release, tap: { environment.router.askSeed = AskSeed() }))
+            .accessibilityAction(named: "Start voice ask") { environment.beginHeldVoice(capture: false, anchor: frame) }
+            .modifier(PushToTalk(start: { environment.beginHeldVoice(capture: false, anchor: frame) }, move: environment.voice.move, release: environment.voice.release, tap: { environment.router.askSeed = AskSeed() }))
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 
 extension AppEnvironment {
-    func beginHeldVoice(capture: Bool) {
+    func beginHeldVoice(capture: Bool, anchor: CGRect? = nil) {
+        router.heldVoiceAnchor = anchor
         voice.start(capture: capture, simulated: simulator != nil)
         if capture { router.heldVoiceCapture = true }
         else { router.heldVoiceAsk = AskSeed(voice: true) }

@@ -55,18 +55,20 @@ struct ConversationView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let pending = environment.needsYou.all.first(where: { $0.workItemID == model.conversationID && ($0.kind == .question || $0.kind == .decision || $0.kind == .approval) }) { NeedsYouCard(item: pending) }
-            if model.conversation?.readOnly == true {
-                HStack(spacing: 6) {
-                    Image(systemName: "lock").accessibilityHidden(true)
-                    Text(model.conversation?.isBotChat == true ? "Studio canonical thread · Read only" : "Read-only thread")
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(.bar)
-            } else { ComposerView(model: model, focus: $composerFocused) }
+            VStack(spacing: 0) {
+                if let pending = environment.needsYou.all.first(where: { $0.workItemID == model.conversationID && ($0.kind == .question || $0.kind == .decision || $0.kind == .approval) }) { NeedsYouCard(item: pending) }
+                if model.conversation?.readOnly == true {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock").accessibilityHidden(true)
+                        Text(model.conversation?.isBotChat == true ? "Studio canonical thread · Read only" : "Read-only thread")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(.bar)
+                } else { ComposerView(model: model, focus: $composerFocused) }
+            }
         }
         // Like other chat apps, the conversation owns the bottom edge: the
         // composer replaces the floating tab bar instead of stacking on it.

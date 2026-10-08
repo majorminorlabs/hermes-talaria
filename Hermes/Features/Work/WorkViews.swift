@@ -55,12 +55,14 @@ struct NowView: View {
         ScrollViewReader { proxy in
         TimelineView(.periodic(from: .now, by: 30)) { _ in
             List {
-                Section {
-                    if environment.connection.connection.isConnected {
-                        Text(status).font(.subheadline).foregroundStyle(Theme.secondaryText)
-                    } else {
-                        ConnectionNoticeSection()
-                        Button("Retry") { Task { await environment.connection.reconnect(); await environment.refreshAll() } }
+                if !environment.connection.connection.isConnected || !status.isEmpty {
+                    Section {
+                        if environment.connection.connection.isConnected {
+                            Text(status).font(.subheadline).foregroundStyle(Theme.secondaryText)
+                        } else {
+                            ConnectionNoticeSection()
+                            Button("Retry") { Task { await environment.connection.reconnect(); await environment.refreshAll() } }
+                        }
                     }
                 }
                 if environment.connection.activeHost == nil { Section { UnpairedWelcome() } }
@@ -120,7 +122,11 @@ struct NowView: View {
     }
     private var savedCaptures: [CaptureRecord] { environment.outbox.captures.filter { $0.hostID == environment.connection.activeHostID && $0.state == .confirmed && $0.context["thread_id"] != nil && $0.createdAt > .now.addingTimeInterval(-86400) } }
     private var upcoming: [Routine] { environment.routines.sorted.filter { $0.isEnabled && ($0.nextRunAt ?? .distantFuture) < .now.addingTimeInterval(86400) } }
-    private var status: String { "\(environment.needsYou.actionableCount == 0 ? "Nothing needs you" : "\(environment.needsYou.actionableCount) need you")\(working.isEmpty ? "" : " · \(working.count) working")" }
+    /// Counts only; the empty Needs You row already says "Nothing needs you".
+    private var status: String {
+        let count = environment.needsYou.actionableCount
+        return [count == 0 ? nil : "\(count) need you", working.isEmpty ? nil : "\(working.count) working"].compactMap { $0 }.joined(separator: " · ")
+    }
     private func row(_ item: WorkItem) -> some View { NavigationLink(value: item.route) { WorkItemRow(item: item) }.swipeActions {
         if let run = item.runs.first(where: { $0.canStop }), environment.connection.connection.isConnected {
             Button("Stop", role: .destructive) { risk = RiskAction(verb: "Stop", effect: "Stops all of this work. Work already done stays.", target: item.title) { try await environment.activity.stop(run.id) } }

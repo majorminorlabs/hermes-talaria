@@ -34,7 +34,7 @@ signing can manage development profiles; see
 
 ```sh
 git clone https://github.com/majorminorlabs/tools-talaria.git
-cd hermes-talaria
+cd tools-talaria
 open Hermes.xcodeproj
 ```
 

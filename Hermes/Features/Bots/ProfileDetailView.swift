@@ -3,6 +3,7 @@ import SwiftUI
 /// A bot (Hermes profile): identity, what it's doing, its conversations,
 /// runs, routines, skills and configuration metadata.
 struct ProfileDetailView: View {
+    @State private var micFrame: CGRect?
     var profileID: String
 
     @Environment(AppEnvironment.self) private var environment
@@ -228,7 +229,9 @@ struct ProfileDetailView: View {
                 environment.voice.start(capture: false, simulated: environment.simulator != nil)
                 router.askSeed = AskSeed(agentID: profile.id, voice: true)
             }.labelStyle(.iconOnly).frame(width: 44, height: 44)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { micFrame = $0 }
                 .modifier(PushToTalk(start: {
+                    router.heldVoiceAnchor = micFrame
                     environment.voice.start(capture: false, simulated: environment.simulator != nil)
                     router.heldVoiceAsk = AskSeed(agentID: profile.id, voice: true)
                 }, move: environment.voice.move, release: environment.voice.release, tap: { environment.voice.start(capture: false, simulated: environment.simulator != nil); environment.router.askSeed = AskSeed(agentID: profile.id, voice: true) }))

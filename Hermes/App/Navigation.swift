@@ -54,6 +54,8 @@ final class AppRouter {
     var captureSeed: CaptureSeed?
     var heldVoiceAsk: AskSeed?
     var heldVoiceCapture = false
+    /// Window frame of the button being held, so the voice card grows out of it.
+    var heldVoiceAnchor: CGRect?
     var needsFocusID: String?
     var stepsRunID: String?
     func open(_ route: Route) {

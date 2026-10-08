@@ -25,7 +25,7 @@ struct RootView: View {
         .task { if HermesLiveActivityController.demoEnabled { liveActivity.startDemo() } }
         .onChange(of: environment.activity.runs, initial: true) { _, _ in updateLiveActivity() }
         .onChange(of: connection.connection) { _, _ in updateLiveActivity() }
-        .overlay(alignment: .bottom) { HeldVoiceOverlay() }
+        .overlay { HeldVoiceOverlay().ignoresSafeArea() }
         .sheet(item: $router.askSeed) { AskSheet(seed: $0) }
         .sheet(item: $router.captureSeed) { CaptureSheet(seed: $0) }
         .onOpenURL { router.handle($0) }
@@ -70,20 +70,64 @@ struct RootView: View {
         }
     }
 }
-/// Recording feedback shared by the toolbar and composer.
+/// The small pointer joining the held-voice card to its button. The edge
+/// stroke matches the card's accent outline; the fill covers the card's own
+/// outline where they meet.
+private struct HeldVoicePointer: View {
+    var up: Bool
+    var body: some View {
+        ZStack {
+            Triangle(up: up, closed: true).fill(Theme.panel)
+            Triangle(up: up, closed: false).stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+        }
+    }
+    private struct Triangle: Shape {
+        var up: Bool
+        var closed: Bool
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            let tip = CGPoint(x: rect.midX, y: up ? rect.minY : rect.maxY)
+            let base = up ? rect.maxY : rect.minY
+            path.move(to: CGPoint(x: rect.minX, y: base)); path.addLine(to: tip); path.addLine(to: CGPoint(x: rect.maxX, y: base))
+            if closed { path.closeSubpath() }
+            return path
+        }
+    }
+}
+
+/// Recording feedback for a held Ask, attached to the button being held.
 private struct HeldVoiceOverlay: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(AppRouter.self) private var router
+    private var targetName: String { environment.profiles.name(router.heldVoiceAsk?.agentID ?? Profile.defaultID) }
+    private var isActive: Bool { router.heldVoiceAsk != nil || router.heldVoiceCapture }
     var body: some View {
-        Group {
-            if router.heldVoiceAsk != nil || router.heldVoiceCapture {
-                ScrollView {
-                    VoiceOverlay(session: environment.voice, send: { _, _ in }, edit: { _ in }, allowAutoSend: false,
-                                 targetName: environment.profiles.name(router.heldVoiceAsk?.agentID ?? Profile.defaultID), sendOnStop: router.heldVoiceAsk != nil)
-                }.fixedSize(horizontal: false, vertical: true).frame(maxHeight: 400)
-                    .padding().padding(.bottom, 110)
+        // Window coordinates (the overlay ignores safe areas), matching the
+        // anchor's `.global` frame. The card hangs from the button being held.
+        GeometryReader { geometry in
+            let size = geometry.size
+            let anchor = router.heldVoiceAnchor ?? CGRect(x: size.width - 64, y: 80, width: 44, height: 44)
+            let width = min(360, size.width - 24)
+            let minX = min(max(12, anchor.midX + 36 - width), size.width - 12 - width)
+            let below = anchor.midY < size.height / 2
+            let pointer = anchor.midX - minX
+            if isActive {
+                VStack(spacing: 0) {
+                    if below { HeldVoicePointer(up: true).frame(width: 20, height: 10).offset(x: pointer - width / 2, y: 1).zIndex(1) }
+                    ScrollView {
+                        VoiceOverlay(session: environment.voice, send: { _, _ in }, edit: { _ in }, allowAutoSend: false,
+                                     targetName: targetName, sendOnStop: router.heldVoiceAsk != nil)
+                    }.fixedSize(horizontal: false, vertical: true).frame(maxHeight: 400).scrollBounceBehavior(.basedOnSize)
+                    if !below { HeldVoicePointer(up: false).frame(width: 20, height: 10).offset(x: pointer - width / 2, y: -1).zIndex(1) }
+                }
+                .frame(width: width)
+                .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: below ? .topLeading : .bottomLeading)
+                .offset(x: minX, y: below ? anchor.maxY + 4 : -(size.height - anchor.minY + 4))
+                .transition(.scale(scale: 0.25, anchor: UnitPoint(x: pointer / width, y: below ? 0 : 1)).combined(with: .opacity))
             }
         }
+        .animation(.spring(duration: 0.28, bounce: 0.15), value: isActive)
         .onChange(of: environment.voice.phase) { _, phase in
             guard router.heldVoiceAsk != nil || router.heldVoiceCapture else { return }
             if phase == .review {

@@ -5,6 +5,13 @@ supports [Xcode](docs/XCODE_INSTALL.md) and [SideStore](docs/SIDESTORE_USER_GUID
 later public-ID phone validation is recorded in [release readiness](docs/RELEASE_READINESS.md).
 The published v0.1.0 release artifacts remain unchanged.
 
+## Unreleased
+
+- Now shows its empty Needs You message once; the status line contains active counts.
+- Held voice Ask feedback attaches to the microphone button that started recording.
+- Pinned Needs You cards stack above the conversation composer or read-only footer.
+- Xcode installation instructions use the current clone directory, `tools-talaria`.
+
 ## 0.2.0 — binary release (2026-10-06)
 
 The v0.2.0 release includes an unsigned IPA, device archive and bridge package.
