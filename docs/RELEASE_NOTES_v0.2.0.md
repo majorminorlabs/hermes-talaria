@@ -13,11 +13,11 @@ Hermes or explicit Agent routing.
 
 Physical 0.2.0 acceptance passed, including the data-preserving Xcode upgrade,
 two independent Agent threads, real Ask/Capture/steering/Stop and owner-confirmed
-keyboard/paste, voice and camera. See the [acceptance record](https://github.com/majorminorlabs/hermes-talaria/blob/v0.2.0/docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
+keyboard/paste, voice and camera. See the [acceptance record](https://github.com/majorminorlabs/tools-talaria/blob/v0.2.0/docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
 Download `Talaria-v0.2.0.ipa` and verify `SHA256SUMS.txt`. The IPA and archive are
-unsigned; use your own signing through [SideStore](https://github.com/majorminorlabs/hermes-talaria/blob/v0.2.0/docs/SIDESTORE_USER_GUIDE.md)
-or [Xcode](https://github.com/majorminorlabs/hermes-talaria/blob/v0.2.0/docs/XCODE_INSTALL.md).
+unsigned; use your own signing through [SideStore](https://github.com/majorminorlabs/tools-talaria/blob/v0.2.0/docs/SIDESTORE_USER_GUIDE.md)
+or [Xcode](https://github.com/majorminorlabs/tools-talaria/blob/v0.2.0/docs/XCODE_INSTALL.md).
 Keep your installed app identity and Team stable to preserve local data. The
 bridge source package is `hermes-mobile-bridge-v0.2.0.tar.gz`.
 

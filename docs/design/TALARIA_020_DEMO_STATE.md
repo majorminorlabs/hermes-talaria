@@ -1,7 +1,7 @@
 # Talaria 0.2.0 demo state
 
 Build: **0.2.0 / 2**. Release/tag: **v0.2.0**.
-Release: https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0
+Release: https://github.com/majorminorlabs/tools-talaria/releases/tag/v0.2.0
 Accepted runtime source: `417999dcc056b3afa33a37d56a0f17ce9b521a47`.
 The tag includes only release/acceptance documentation added to that implementation.
 

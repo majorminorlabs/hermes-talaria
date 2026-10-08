@@ -10,7 +10,7 @@ through a private authenticated bridge. Hermes owns the runtime and history.
 · [What changed](CHANGELOG.md) · [MAJOR//MINOR article](https://majorminor.xyz/releases/talaria)
 
 **Current release: 0.2.0 / build 2.** Download the unsigned IPA and bridge package
-from [v0.2.0](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0),
+from [v0.2.0](https://github.com/majorminorlabs/tools-talaria/releases/tag/v0.2.0),
 or build source with Xcode. See the [physical acceptance record](docs/PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
 <img src="docs/images/now.png" alt="Now with synthetic Needs You work" width="240"> <img src="docs/images/agents.png" alt="Agents with synthetic work and runtime models" width="240">
@@ -96,7 +96,7 @@ Live Activity extension. Review-note plus task transition uses two upstream oper
 
 The vNext design is a roadmap; planned Phase 2 items are not shipped features.
 Historical validation reports describe their named revisions, not current acceptance.
-Report issues through [GitHub Issues](https://github.com/majorminorlabs/hermes-talaria/issues)
+Report issues through [GitHub Issues](https://github.com/majorminorlabs/tools-talaria/issues)
 with private tokens, hostnames and conversation content removed.
 
 [MIT](LICENSE), by MAJOR//MINOR. See [third-party notices](THIRD_PARTY_NOTICES.md).

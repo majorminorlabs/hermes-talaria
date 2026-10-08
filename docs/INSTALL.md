@@ -38,7 +38,7 @@ Paid membership is optional for personal-device testing. Follow
 ### Option B: SideStore
 
 Install official SideStore, configure LocalDevVPN and import the
-[published IPA](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0).
+[published IPA](https://github.com/majorminorlabs/tools-talaria/releases/tag/v0.2.0).
 Leave normal App-ID customization/suffix behavior enabled. A resigned identity
 such as `xyz.majorminor.talaria.<YOUR TEAM ID>` is expected. Follow the
 [SideStore user guide](SIDESTORE_USER_GUIDE.md), then pair with the same bridge.
@@ -55,7 +55,7 @@ Keep your installed identity and Team stable when upgrading.
 Clone this repository on the Studio, then install the bridge for the macOS account that owns the Hermes installation:
 
 ```sh
-git clone https://github.com/majorminorlabs/hermes-talaria.git ~/src/talaria
+git clone https://github.com/majorminorlabs/tools-talaria.git ~/src/talaria
 cd ~/src/talaria
 ./scripts/install-bridge.sh --bot-management --bot-chat --bot-mode --board default
 ```

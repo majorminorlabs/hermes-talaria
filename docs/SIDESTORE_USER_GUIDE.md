@@ -70,7 +70,7 @@ passcode, your own Apple Account and Tailscale access to your Mac.
    off. A free account has a seven-day signing window and app/App-ID limits; check
    the [FAQ](https://docs.sidestore.io/docs/faq) before adding other apps.
 3. **Get and verify the Talaria IPA.** Download `Talaria-v0.2.0.ipa` and the
-   [release](https://github.com/majorminorlabs/hermes-talaria/releases/tag/v0.2.0)'s
+   [release](https://github.com/majorminorlabs/tools-talaria/releases/tag/v0.2.0)'s
    `SHA256SUMS.txt`; compare the IPA's `shasum -a 256 Talaria-v0.2.0.ipa` output
    with its entry in that file on your Mac. The unsigned archive
    has the public base ID and no provisioning profile or personal certificate.
