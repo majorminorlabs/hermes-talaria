@@ -99,3 +99,27 @@ disclosed unsigned prerelease, not proof of a physical new-user signing workflow
 
 See [the handoff](PUBLIC_RELEASE_HANDOFF.md) for the exact proposed publication and
 owner decisions. No publication authorization is inferred from completion of tests.
+
+## v0.2.1 verification (2026-10-09)
+
+The approvals tree was transferred from the local development branch as one
+sanitized commit on public main, retaining all functional Swift and Python code.
+Original development history is not part of the release ancestry.
+
+- 100 Swift tests in 16 suites passed; 5 approval UI tests passed.
+- 113 bridge tests passed; 1 opt-in installed-Hermes integration test skipped.
+- 8 packaging checks and 9 service checks passed.
+- All new public commit diffs passed the requested private-literal and credential
+  pattern sweep. Tracked files passed known-private-value comparison in memory.
+- All 13 new screenshots were inspected and show approval-test content. Journal
+  identifiers and private validation paths were replaced with placeholders.
+- Generated build output and the deployment report are untracked.
+- IPA/archive byte parity, app/extension identity and 0.2.1/build 3, absent signing
+  material, relative source-input hashes and artifact privacy checks passed.
+- The bridge source package installed and its CLI started in a clean environment.
+- The same approvals code passed physical tests at 0.2.0/build 2. No separate
+  0.2.1 physical PASS is claimed; build metadata says NOT_PERFORMED.
+
+Published verification requires downloading all four release assets, checking
+SHA256SUMS, rescanning downloaded packages, comparing the tag to main and the
+release body to RELEASE_NOTES_v0.2.1.md. Receipts stay in ignored local build output.
