@@ -140,7 +140,7 @@ fi
 
 MARKETING_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
-[[ "$MARKETING_VERSION" == "$VERSION" && "$BUILD_NUMBER" == "2" ]] || { echo "App/bridge release version mismatch." >&2; exit 1; }
+[[ "$MARKETING_VERSION" == "$VERSION" && "$BUILD_NUMBER" == "3" ]] || { echo "App/bridge release version mismatch." >&2; exit 1; }
 
 EXTENSION_INFO="$APP_PATH/PlugIns/TalariaLiveActivity.appex/Info.plist"
 [[ -f "$EXTENSION_INFO" ]] || { echo "Missing Live Activity extension." >&2; exit 1; }
@@ -193,7 +193,7 @@ root = pathlib.Path(os.environ['TALARIA_RELEASE_ROOT'])
 tracked = subprocess.check_output(['git', '-C', str(root), 'ls-files', '-z']).decode().split('\0')
 inputs = {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in tracked
           if name and (name.startswith(('Hermes/', 'Hermes.xcodeproj/', 'Config/', 'TalariaActivityShared/', 'TalariaLiveActivity/')) or name == 'scripts/build-ios-release.sh')}
-metadata = {'product': 'Talaria', 'publisher': 'MAJOR//MINOR', 'version': '0.2.0', 'build': '2',
+metadata = {'product': 'Talaria', 'publisher': 'MAJOR//MINOR', 'version': '0.2.1', 'build': '3',
             'bundle_identifier': 'xyz.majorminor.talaria', 'signing': 'unsigned',
             'physical_device_validation': 'PASS' if os.environ['TALARIA_DEVICE_VALIDATED'] == '1' else 'NOT_PERFORMED',
             'source_input_sha256': inputs}

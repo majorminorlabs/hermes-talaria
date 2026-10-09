@@ -5,6 +5,15 @@ supports [Xcode](docs/XCODE_INSTALL.md) and [SideStore](docs/SIDESTORE_USER_GUID
 later public-ID phone validation is recorded in [release readiness](docs/RELEASE_READINESS.md).
 The published v0.1.0 release artifacts remain unchanged.
 
+## 0.2.1 — in-app Hermes command approvals (2026-10-09)
+
+Approve once, approve for the session, or deny the exact Hermes request. Now
+provides Approve/Deny swipe actions. Stale taps safely show “No longer pending.”
+Requires Hermes server-request approvals (4bb9e57 or newer), with Mac fallback
+for older versions. Bridge capability detection and the audited `reconcile-run`
+operator command are included. Lock screen/notification approvals are excluded
+by design. App and bridge version 0.2.1; app build 3.
+
 ## Unreleased
 
 - Now shows its empty Needs You message once; the status line contains active counts.

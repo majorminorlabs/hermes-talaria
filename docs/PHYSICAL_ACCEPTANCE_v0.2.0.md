@@ -1,5 +1,10 @@
 # Talaria 0.2.0 physical acceptance
 
+> Current release update: v0.2.1 supports in-app Hermes command approvals when
+> Hermes advertises server-request approvals (4bb9e57 or newer). Older Hermes
+> retains “Approve on your Mac.” Mac-only approval references below describe
+> the earlier design or release.
+
 physical_device_validation: PASS
 validation_bundle_identifier: xyz.majorminor.talaria
 validation_version: 0.2.0

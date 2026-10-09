@@ -1,5 +1,10 @@
 # Talaria vNext: interface design spec
 
+> Current release update: v0.2.1 supports in-app Hermes command approvals when
+> Hermes advertises server-request approvals (4bb9e57 or newer). Older Hermes
+> retains “Approve on your Mac.” Mac-only approval references below describe
+> the earlier design or release.
+
 Status: design pass for the next major implementation. No code in this document.
 Author: lead UI/UX pass, 2026-10-05, based on the working tree at `c198f24` (branch
 `codex/public-release-preparation`).

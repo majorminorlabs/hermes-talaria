@@ -1,7 +1,7 @@
 # Use Talaria
 
 [Install and pair](INSTALL.md) first. Keep Tailscale connected and the Mac awake,
-logged in and reachable. This guide describes current 0.2.0 source; the v0.1.0 IPA
+logged in and reachable. This guide describes current 0.2.1 source; the v0.1.0 IPA
 still has the earlier interface.
 
 ## Now, Threads, Agents and Studio
@@ -9,8 +9,12 @@ still has the earlier interface.
 **Now** shows Needs You, Working, Done and Next Up. Needs You includes supported
 clarifications, task reviews, routine interventions and uncertain Outbox commands.
 Answer or use supported task transitions; snooze a request or defer it to your desk.
-Dangerous tool approval is a Mac handoff. Deadlines/defaults appear only when Hermes
-reports them. Review send-back notes and transitions are separate upstream operations.
+Hermes command approvals offer Approve once, Approve for session and Deny, each tied
+to the exact request. Swipe a pending approval on Now to Approve once or Deny.
+Requires Hermes server-request approvals (4bb9e57 or newer); older Hermes shows
+“Approve on your Mac.” If the Mac answers first or Hermes times out, a stale tap
+shows “No longer pending” and refreshes the card. Deadlines appear only when
+Hermes reports them. Lock screen and notification approvals are not included. Review send-back notes and transitions are separate upstream operations.
 
 **Threads** contains conversation and observable work history. Search locally and,
 while connected, on Hermes. Filter by Agent/source, Active, Needs You or Unread;

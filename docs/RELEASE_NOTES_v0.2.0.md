@@ -1,5 +1,10 @@
 # Talaria v0.2.0
 
+> Current release update: v0.2.1 supports in-app Hermes command approvals when
+> Hermes advertises server-request approvals (4bb9e57 or newer). Older Hermes
+> retains “Approve on your Mac.” Mac-only approval references below describe
+> the earlier design or release.
+
 Talaria 0.2.0 / build 2 brings Now, Threads and Agents to the iPhone, with
 independent threads for the same Agent and a global Ask composer that previews
 Hermes or explicit Agent routing.

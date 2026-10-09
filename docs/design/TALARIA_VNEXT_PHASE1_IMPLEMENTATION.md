@@ -1,5 +1,10 @@
 # Talaria vNext Phase 1 implementation
 
+> Current release update: v0.2.1 supports in-app Hermes command approvals when
+> Hermes advertises server-request approvals (4bb9e57 or newer). Older Hermes
+> retains “Approve on your Mac.” Mac-only approval references below describe
+> the earlier design or release.
+
 Historical Phase 1 evidence. Current 0.2.0 source also includes the
 [Live Activity extension](TALARIA_LIVE_ACTIVITY.md), unified headers, down-to-lock
 voice gestures, held Ask send-on-release and SSE recovery fixes. See the

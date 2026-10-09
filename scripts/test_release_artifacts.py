@@ -50,7 +50,7 @@ class ReleaseTests(unittest.TestCase):
             result = subprocess.run([str(ROOT/'scripts/build-ios-release.sh'), '--sidestore-ipa',
                                      '--physical-validation-report', str(report)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 2)
-            self.assertIn('validation_version: 0.2.0', result.stderr)
+            self.assertIn('validation_version: 0.2.1', result.stderr)
 
     def test_detects_payload_privacy_and_signing(self):
         with tempfile.TemporaryDirectory() as tmp:
