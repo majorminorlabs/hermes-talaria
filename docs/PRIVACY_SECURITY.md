@@ -32,5 +32,7 @@ and provision a replacement using [pairing](INSTALL.md#pair-and-verify). Review 
 unpublished commit trees as well as HEAD before publication. Do not rewrite public
 history without an explicit recovery decision if an actual credential was published.
 
-No APNs delivery, background monitoring guarantee or remote dangerous tool approvals.
+No APNs delivery or background monitoring guarantee. In-app Hermes command
+approvals require exact server requests; lock screen and notification approvals
+are not included. Older Hermes requires approval on the Mac.
 This is a scoped implementation review, not an independent penetration test.

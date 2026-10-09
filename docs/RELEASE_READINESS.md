@@ -1,3 +1,8 @@
+> Current release: 0.2.1 / build 3 adds in-app Hermes command approvals.
+> See [release notes](RELEASE_NOTES_v0.2.1.md) and
+> [approval validation](IN_APP_APPROVALS_VALIDATION.md). The prior physical
+> acceptance below covers 0.2.0; no separate 0.2.1 device PASS is claimed.
+
 > The source-update preparation below is historical. Current 0.2.0 binary release
 > acceptance and remaining limits are in [physical acceptance](PHYSICAL_ACCEPTANCE_v0.2.0.md).
 
