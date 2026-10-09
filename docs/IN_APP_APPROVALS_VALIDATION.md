@@ -212,7 +212,7 @@ No Hermes source, signing settings, notification actions, or deployment changed.
 | Close/reopen d.txt | PASS: Mirroring closed for at least 30 seconds; same approval returned with correct countdown; phone Approve once succeeded | `<run-or-request-id>` | d.txt absent |
 | Swipe e.txt | FAIL: Now's working row exposes Stop; the Needs You card has no approval swipe actions. Denied via the card afterward; agent received BLOCKED | `<run-or-request-id>` | e.txt remains |
 
-Evidence is retained under [evidence/in-app-approvals-20261009](evidence/in-app-approvals-20261009/):
+Evidence is retained under `evidence/in-app-approvals-20261009/`:
 
 - Deny: [pending](evidence/in-app-approvals-20261009/deny-pending.png), [result](evidence/in-app-approvals-20261009/deny-result.png), [journal](evidence/in-app-approvals-20261009/deny-journal.jsonl), seq 9555 requested, 9556 resolved, 9557 BLOCKED.
 - Mac wins: [pending](evidence/in-app-approvals-20261009/mac-pending.png), [stale toast](evidence/in-app-approvals-20261009/mac-stale-toast.png), [journal](evidence/in-app-approvals-20261009/mac-journal.jsonl), seq 9640 requested, 9641 expired/withdrawn, 9642 terminal completed with exit code 0.
