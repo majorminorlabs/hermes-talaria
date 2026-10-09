@@ -20,7 +20,7 @@ struct ApprovalCard: View {
     @State private var resolvedCount = 0
 
     var body: some View {
-        let availability = approval.isClarification ? approval.effectiveAvailability(remoteApprovalsSupported: false) : ApprovalAvailability.unavailableRemotely("Approve on your Mac. Talaria cannot safely target this approval.")
+        let availability = approval.effectiveAvailability(remoteApprovalsSupported: connection.supports(.approvals))
         let tint = availability == .expired ? Color.secondary : Theme.attention
 
         VStack(alignment: .leading, spacing: 12) {
@@ -30,10 +30,10 @@ struct ApprovalCard: View {
                 Text(approval.isClarification ? "Hermes needs an answer" : availability.title)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                if approval.risk != .low {
-                    Text(approval.risk.label)
+                if let risk = approval.risk, risk != .low {
+                    Text(risk.label)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(approval.risk == .high ? Theme.failure : .secondary)
+                        .foregroundStyle(risk == .high ? Theme.failure : .secondary)
                 }
             }
 
@@ -62,6 +62,9 @@ struct ApprovalCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if let timeout = approval.timeoutExplanation {
+                Text(timeout).font(.footnote).foregroundStyle(.secondary)
+            }
             controls(availability)
         }
         .padding(style == .card ? 14 : 0)
@@ -86,35 +89,7 @@ struct ApprovalCard: View {
                 Button("Stop Run", systemImage: "stop.circle", role: .destructive) { toasts.perform { try await activity.stop(run.id) } }
             }
         } else if availability.isActionable {
-            HStack(spacing: 10) {
-                Button(role: .destructive) {
-                    decide(.deny)
-                } label: {
-                    Text("Deny").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-
-                Menu {
-                    Button("Approve Once", systemImage: "checkmark") { decide(.approveOnce) }
-                    if approval.allowsSessionApproval {
-                        Button("Approve for This Session", systemImage: "checkmark.seal") { decide(.approveForSession) }
-                    }
-                } label: {
-                    Group {
-                        if pendingDecision?.isApproval == true {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("Approve")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                } primaryAction: {
-                    decide(.approveOnce)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .controlSize(.large)
-            .disabled(pendingDecision != nil || !connection.connection.isConnected)
+            ApprovalChoiceButtons(approval: approval, pending: pendingDecision != nil || !connection.connection.isConnected, decide: decide)
             if showsDetailsLink && (approval.diff != nil || approval.reason != nil) {
                 detailsButton
             }
@@ -139,6 +114,7 @@ struct ApprovalCard: View {
     }
 
     private func decide(_ decision: ApprovalDecision) {
+        guard pendingDecision == nil else { return }
         pendingDecision = decision
         Task {
             do {
@@ -163,4 +139,21 @@ struct ApprovalCard: View {
         .padding()
     }
     .previewEnvironment()
+}
+
+/// The same offered choices and resolve path on Now and Run Detail.
+struct ApprovalChoiceButtons: View {
+    var approval: ApprovalRequest
+    var pending: Bool
+    var decide: (ApprovalDecision) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(approval.offeredDecisions, id: \.self) { decision in
+                Button(decision.title, role: decision == .deny ? .destructive : nil) { decide(decision) }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("approval-\(approval.id)-\(decision.choice)")
+                    .frame(minHeight: 44)
+            }
+        }.disabled(pending)
+    }
 }

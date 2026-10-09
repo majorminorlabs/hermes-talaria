@@ -69,7 +69,7 @@ struct ApprovalDetailView: View {
 
             Section {
                 KeyValueRow(label: "Type", value: approval.kind.label)
-                KeyValueRow(label: "Risk", value: approval.risk.label)
+                if let risk = approval.risk { KeyValueRow(label: "Risk", value: risk.label) }
                 KeyValueRow(label: "Requested by", value: profiles.name(approval.profileID))
                 KeyValueRow(label: "Requested", value: Format.timestamp(approval.requestedAt))
                 if let expires = approval.expiresAt {

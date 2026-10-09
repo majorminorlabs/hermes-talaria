@@ -692,6 +692,35 @@ struct BridgeIntegrationTests {
         #expect(String(data: posts.first?.httpBody ?? Data(), encoding: .utf8)?.contains("A.swift") == true)
     }
 
+    @Test func exactApprovalPostsChoiceAndMapsStale() async throws {
+        let hostID = "studio-\(UUID().uuidString)", domain = uniqueBridgeTestHost()
+        let recorder = BridgeRequestRecorder()
+        BridgeStubURLProtocol.register(host: domain) { request in
+            recorder.append(request)
+            if request.url?.path.hasSuffix("/capabilities") == true {
+                return capabilitiesResponse(features: #""approvals":{"respond":true}"#)
+            }
+            if request.url?.path.contains("stale") == true {
+                return BridgeStubResponse(status: 409, body: #"{"error":{"code":"stale_attention"}}"#)
+            }
+            return BridgeStubResponse(body: #"{"acknowledged":true}"#)
+        }
+        defer { BridgeStubURLProtocol.unregister(host: domain) }
+        let client = BridgeHermesClient(credentials: BridgeTestCredentialStore(hostID: hostID, token: "token"),
+            session: makeBridgeTestSession(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await client.client.hosts.connect(to: bridgeHost(id: hostID, domain: domain))
+        try await client.client.runs.resolveApproval(id: "exact", decision: .approveOnce)
+        await #expect(throws: HermesError.staleAttention) {
+            try await client.client.runs.resolveApproval(id: "stale", decision: .deny)
+        }
+        let posts = recorder.requests.filter { $0.httpMethod == "POST" }
+        #expect(posts.count == 2)
+        #expect(posts.first?.url?.path.hasSuffix("/attention/exact/respond") == true)
+        let body = try JSONDecoder().decode(BridgeJSON.self, from: posts.first!.httpBody!)
+        #expect(body["choice"].string == "once")
+        #expect(body.object.count == 1)
+    }
+
     @Test func sseTransportRequestsReplayFromProvidedCursor() async throws {
         let hostID = "studio-\(UUID().uuidString)"
         let domain = uniqueBridgeTestHost()

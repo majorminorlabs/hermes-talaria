@@ -35,6 +35,12 @@ extension MockHermesBackend: CaptureService {
     }
     func answerClarification(id: String, answer: String) async throws {
         try await perform(.runs) {
+            if simulation.staleNextClarification {
+                simulation.staleNextClarification = false
+                approvals[id] = nil
+                publish(.approvalResolved(approvalID: id, decision: nil))
+                throw HermesError.staleAttention
+            }
             guard let request = approvals[id], request.isClarification, request.availability.isActionable,
                   request.expiresAt.map({ $0 > .now }) ?? true else { throw HermesError.rejected("This question has expired") }
             guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw HermesError.rejected("Enter an answer") }

@@ -58,7 +58,7 @@ import Foundation
             NeedsYouItem(id: a.id, kind: a.isClarification ? ((a.clarificationChoices ?? []).isEmpty ? .question : .decision) : .approval,
                 workItemID: a.conversationID, agentID: a.profileID, request: a.clarificationQuestion ?? a.summary,
                 context: a.reason, choices: a.clarificationChoices ?? [], deadline: a.expiresAt,
-                canRespond: a.isClarification && a.availability.isActionable, riskTier: .low, observedAt: a.requestedAt,
+                canRespond: a.effectiveAvailability(remoteApprovalsSupported: connection.supports(.approvals)).isActionable, riskTier: .low, observedAt: a.requestedAt,
                 runID: a.runID, approval: a)
         }
         for ask in outbox.asks where ask.hostID == connection.activeHostID && ask.state == .uncertain {

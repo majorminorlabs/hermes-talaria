@@ -45,7 +45,7 @@ or build source with Xcode. See the [physical acceptance record](docs/PHYSICAL_A
 Configured Kanban boards, routines, media previews and optional Research Terminal
 retrieval remain available. User-facing Agents are underlying Hermes bots/profiles;
 independent Agent threads leave canonical Bot Chats intact. Capabilities depend on
-the audited Hermes host. Dangerous tool approvals stay on the Mac.
+the audited Hermes host. Dangerous tool approvals can be answered in-app when Hermes advertises exact approval server requests; legacy approvals stay on the Mac.
 
 ## Architecture and privacy
 

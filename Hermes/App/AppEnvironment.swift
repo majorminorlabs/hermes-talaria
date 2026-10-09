@@ -136,6 +136,18 @@ final class AppEnvironment {
     private func applySimulationLaunchArguments() {
         guard let simulator else { return }
         let defaults = UserDefaults.standard
+        simulator.simulation.staleNextApproval = defaults.bool(forKey: "staleNextApproval")
+        if defaults.bool(forKey: "approvalFixture") {
+            simulator.approvals = simulator.approvals.filter { $0.key == "a-rm" }
+            simulator.runs = simulator.runs.filter { $0.key == "r-ios" }
+            simulator.conversations = simulator.conversations.filter { $0.key == "c-caddy" }
+            simulator.tasks = [:]
+            simulator.routines = [:]
+            // Match Hermes snapshots: approval identity is resolved by run ID,
+            // and Hermes does not supply a risk level.
+            simulator.runs["r-ios"]?.pendingApprovalID = nil
+            simulator.approvals["a-rm"]?.risk = nil
+        }
         if defaults.bool(forKey: "emptyData") { simulator.simulation.emptyData = true }
         let speed = defaults.double(forKey: "runSpeed")
         if speed > 0 { simulator.simulation.runSpeed = speed }

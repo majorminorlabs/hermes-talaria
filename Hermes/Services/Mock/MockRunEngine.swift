@@ -162,7 +162,8 @@ extension MockHermesBackend {
             workingDirectory: template.workingDirectory, paths: template.paths, diff: template.diff,
             reason: template.reason, risk: template.risk, requestedAt: .now,
             expiresAt: template.expiresIn.map { Date.now.addingTimeInterval($0) },
-            availability: template.availability, allowsSessionApproval: template.availability.isActionable)
+            availability: template.availability, allowsSessionApproval: template.availability.isActionable,
+            approvalChoices: template.availability.isActionable ? ["once", "session", "deny"] : nil)
         upsert(approval)
         mutateRun(runID) { run in
             run.state = .waitingForApproval

@@ -246,20 +246,41 @@ class Service:
         params, method, request_id = request.get("params") or {}, request.get("method"), request.get("id")
         if not isinstance(request_id, str) or not request_id.startswith("srq-"):
             return
-        questions = params.get("questions", [])[:5] if method == "clarify" else [{"qid": None, "question": "This action requires a local client"}]
+        # Read through the existing authenticated, profile-scoped GET route.
+        # Never return or persist the rest of Hermes's configuration. A missing
+        # route/value leaves expiry to Hermes's request.cancel and live snapshot.
+        timeout = None
+        if method == "approval" and "/api/config" in self.backends[profile].paths:
+            conv = self.store.get("conversations", run["conversation_id"])
+            try:
+                config = await self.backends[profile].rest("GET", "/api/config", query={"profile": self.session_profile(conv)})
+                value = config.get("approvals", {}).get("timeout")
+                if value is not None:
+                    timeout = int(value)
+            except (Problem, ValueError, TypeError, OverflowError, AttributeError):
+                pass
+        questions = params.get("questions", [])[:5] if method == "clarify" else [{"qid": None}]
         for question in questions:
             qid = question.get("qid")
             if method == "clarify" and (not isinstance(qid, str) or not isinstance(question.get("question"), str)):
                 continue
             old = next((json.loads(x[0]) for x in self.store.db.execute("SELECT data FROM attention WHERE run_id=?", (run["id"],)).fetchall()
                         if json.loads(x[0]).get("request_id") == request_id and json.loads(x[0]).get("question_id") == qid), None)
+            # A replay cannot resurrect a decision or a withdrawal. Only uncertain
+            # requests may be restored by a new connection snapshot.
+            if old and old["state"] not in {"pending", "uncertain"}:
+                continue
             item = old or {"id": uuid.uuid4().hex, "run_id": run["id"], "conversation_id": run["conversation_id"], "profile": profile,
-                           "observed_at": now(), "expires_at": now() + 290, "request_id": request_id, "question_id": qid}
+                           "observed_at": now(), "expires_at": None, "request_id": request_id, "question_id": qid}
+            if not old:
+                lifetime = 290 if method == "clarify" else timeout
+                item["expires_at"] = item["observed_at"] + lifetime if lifetime is not None else None
             locked = qid in (params.get("answers") or {})
             item.update(kind="clarification" if method == "clarify" else "approval", state="responded" if locked else "pending",
-                        can_respond=method == "clarify" and not locked and item["expires_at"] > now(),
-                        limitation=None if method == "clarify" else "local_client_required", generation=self.backends[profile].generation,
-                        details=only(question, "question choices multi_select recommended default on_timeout") if method == "clarify" else only(params, "command description"))
+                        can_respond=method in {"clarify", "approval"} and not locked and (item["expires_at"] is None or item["expires_at"] > now()),
+                        limitation=None if method in {"clarify", "approval"} else "local_client_required", generation=self.backends[profile].generation,
+                        details=only(question, "question choices multi_select recommended default on_timeout") if method == "clarify" else only(params, "command description choices allow_permanent on_timeout"),
+                        upstream_request_id=params.get("request_id") if method == "approval" else None)
             self.store.db.execute("INSERT INTO attention VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data", (item["id"], run["id"], profile, json.dumps(item)))
             self.store.db.commit()
             self.store.update_run(run["id"], "waiting_for_input")
@@ -267,15 +288,15 @@ class Service:
 
     async def hydrate_requests(self, profile, sid, result):
         for request in result.get("open_requests", []):
-            if request.get("method") == "clarify":
+            if request.get("method") in {"clarify", "approval"}:
                 await self.server_request(profile, sid, request)
 
     def attention_view(self, item):
         if item["can_respond"]:
             run = self.store.get("runs", item["run_id"])
             backend = self.backends[item["profile"]]
-            item = item | {"can_respond": item["state"] == "pending" and item["expires_at"] > now() and backend.connected and backend.generation == item["generation"] and run["state"] == "waiting_for_input" and not run["data"].get("stop_intent")}
-        result = {k: v for k, v in item.items() if k not in {"request_id", "question_id", "generation"}}
+            item = item | {"can_respond": item["state"] == "pending" and (item["expires_at"] is None or item["expires_at"] > now()) and backend.connected and backend.generation == item["generation"] and run["state"] == "waiting_for_input" and not run["data"].get("stop_intent")}
+        result = {k: v for k, v in item.items() if k not in {"request_id", "upstream_request_id", "question_id", "generation"}}
         if item.get("conversation_id"):
             result["profile"] = self.conversation_view(self.store.get("conversations", item["conversation_id"]))["profile"]
         return result
@@ -360,7 +381,7 @@ class Service:
                     await self.reconcile(profile)
             for row in self.store.db.execute("SELECT data FROM attention").fetchall():
                 item = json.loads(row[0])
-                if item["state"] == "pending" and item["expires_at"] < now():
+                if item["state"] == "pending" and item["expires_at"] is not None and item["expires_at"] < now():
                     await self.invalidate_attention(item["run_id"], "expired")
 
     @staticmethod

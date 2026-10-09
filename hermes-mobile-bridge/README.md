@@ -51,6 +51,31 @@ Default listener: `127.0.0.1:8787`. Run as the normal Studio user, not root. A s
 
 For iPhone access, deliberately configure Tailscale HTTPS/reverse proxy to this loopback listener and restrict tailnet ACLs to the intended devices. Disable proxy buffering for `/mobile/v1/events/stream`; do not log Authorization headers or upstream token query URLs. Alternatively configure `tls_cert` and `tls_key` with a valid certificate and a specific tailnet listener address. The CLI refuses a nonloopback listener without TLS. No Tailscale exposure, daemon/launchd registration, certificate provisioning or production service changes are performed by this implementation.
 
+## Reconcile an orphaned run (local operator only)
+
+First make a timestamped, private journal backup using SQLite's backup API
+(including live WAL contents). Then, as the Studio service owner:
+
+```sh
+hermes-mobile-bridge --config /absolute/private/config.json reconcile-run RUN_ID --reason "Why this execution is orphaned"
+```
+
+This is a local CLI command; there is no HTTP endpoint. It refuses states other
+than `unknown`/`uncertain`, and checks Hermes `session.active_list` at execution
+with an authenticated read on a separate socket. Any matching `live_id` refuses
+reconciliation, including idle handles. Failed/unreadable inventory also refuses
+without changing the run. It never resumes, interrupts or submits to Hermes.
+
+A successful reconciliation atomically marks the run `failed` with
+`reason=operator_reconciled` and `coverage_gap=true`, expires pending/uncertain
+attention, and appends `approval.resolved`, `run.reconciled` and `run.failed`
+events. The audit contains the local OS operator, timestamp, supplied reason,
+prior state/reason and live handle. An already reconciled run cannot be reconciled
+again. Other runs and pending command receipts are preserved. The running bridge
+reads these durable changes without a restart; SSE polling observes the journal
+within its normal wait interval. Rerun the updater's normal `ensure_idle` check;
+this command does not bypass the gate or deploy anything.
+
 ## Validate
 
 ```sh
@@ -92,5 +117,5 @@ Kanban lists now include `supported_targets`. Review supports completion with a
 summary. Send back writes a nonempty note through Hermes's existing comment
 endpoint before the status PATCH: these two upstream writes are not atomic. An
 interrupted command must be checked on the Mac and must not be replayed.
-Dangerous approvals remain Mac-only; optional clarification default/timeout
+Exact approval server requests support mobile choices; legacy FIFO approvals remain Mac-only; optional clarification default/timeout
 metadata passes through only when Hermes actually supplies it.

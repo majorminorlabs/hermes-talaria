@@ -105,6 +105,34 @@ class Store:
         self.db.commit()
         return self.get("runs", rid)
 
+    def reconcile_run(self, run, operator, reason):
+        """Local operator repair, inside the caller's checked write transaction."""
+        if not self.db.in_transaction:
+            raise ValueError("Reconciliation requires a write transaction")
+        if run["state"] not in {"unknown", "uncertain"}:
+            raise Problem(409, "reconciliation_unavailable", "Only unknown/uncertain runs may be reconciled")
+        audit = {"operator": operator, "time": now(), "reason": reason,
+                 "prior_state": run["state"], "prior_reason": run["data"].get("reason"),
+                 "state": "failed", "coverage_gap": True, "resolution": "operator_reconciled",
+                 "live_id": run["live_id"]}
+        data = run["data"] | {"reason": "operator_reconciled", "coverage_gap": True, "reconciliation": audit}
+        self.db.execute("UPDATE runs SET state='failed',updated=?,data=? WHERE id=?",
+                        (audit["time"], json.dumps(data), run["id"]))
+        expired = []
+        for row in self.db.execute("SELECT data FROM attention WHERE run_id=?", (run["id"],)).fetchall():
+            item = json.loads(row[0])
+            if item["state"] not in {"pending", "uncertain"}:
+                continue
+            item.update(state="expired", can_respond=False)
+            self.db.execute("UPDATE attention SET data=? WHERE id=?", (json.dumps(item), item["id"]))
+            self.append(run["profile"], "approval.resolved", {"id": item["id"], "state": "expired", "evidence": "operator_reconciled"},
+                        run["id"], run["conversation_id"], commit=False)
+            expired.append(item["id"])
+        event = self.append(run["profile"], "run.reconciled", audit, run["id"], run["conversation_id"], commit=False)
+        self.append(run["profile"], "run.failed", {"state": "failed", "reason": "operator_reconciled", "coverage_gap": True},
+                    run["id"], run["conversation_id"], commit=False)
+        return {"run_id": run["id"], **audit, "expired_attention": expired, "cursor": event["cursor"]}
+
     def runs(self, profiles, states=None, limit=None, offset=0):
         if not profiles:
             return []
@@ -117,7 +145,7 @@ class Store:
         args.extend([limit if limit is not None else -1, offset])
         return [self.get("runs", r[0]) for r in self.db.execute(sql, args).fetchall()]
 
-    def append(self, profile, kind, payload, run_id=None, conversation_id=None, raw=None, dedup=None):
+    def append(self, profile, kind, payload, run_id=None, conversation_id=None, raw=None, dedup=None, *, commit=True):
         if raw is not None and len(json.dumps(raw)) > 65536:
             raw = {"truncated": True}
         if len(json.dumps(payload)) > 131072:
@@ -131,8 +159,9 @@ class Store:
         seq = cur.lastrowid
         evt.update(seq=seq, cursor=f"{self.epoch}:{seq}")
         self.db.execute("UPDATE events SET data=? WHERE seq=?", (json.dumps(evt), seq))
-        self.db.commit()
-        self.prune()
+        if commit:
+            self.db.commit()
+            self.prune()
         return evt
 
     def prune(self):

@@ -53,7 +53,7 @@ nonisolated struct NeedsYouItem: Identifiable, Hashable, Sendable {
     var approval: ApprovalRequest?
     var groupKey: String { "\(kind.rawValue):\(agentID ?? "default"):\(workItemID ?? id)" }
     func expired(at now: Date) -> Bool { deadline.map { $0 <= now } ?? false }
-    func actionable(at now: Date) -> Bool { canRespond && !expired(at: now) && kind != .approval }
+    func actionable(at now: Date) -> Bool { canRespond && !expired(at: now) }
 }
 nonisolated enum ResultSnippet {
     static func extract(_ markdown: String, limit: Int = 160) -> String {

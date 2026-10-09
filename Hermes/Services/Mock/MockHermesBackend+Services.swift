@@ -185,19 +185,27 @@ extension MockHermesBackend: RunService {
 
     func resolveApproval(id: String, decision: ApprovalDecision) async throws {
         try await perform(.approvals) {
-            guard let approval = approvals[id] else { throw HermesError.notFound }
+            if simulation.staleNextApproval {
+                simulation.staleNextApproval = false
+                approvals[id] = nil
+                approvalWaiters.removeValue(forKey: id)?.resume(returning: .deny)
+                publish(.approvalResolved(approvalID: id, decision: nil))
+                throw HermesError.staleAttention
+            }
+            guard let approval = approvals[id] else { throw HermesError.staleAttention }
+            guard approval.offeredDecisions.contains(decision) else { throw HermesError.rejected("Choose an offered approval choice.") }
             switch approval.effectiveAvailability(remoteApprovalsSupported: true) {
             case .actionable: break
-            case .expired: throw HermesError.rejected("This approval has expired.")
+            case .expired: throw HermesError.staleAttention
             case .unavailableRemotely, .ambiguous:
                 throw HermesError.rejected("This approval can't be resolved from the phone. Resolve it on the Studio.")
             }
         }
-        guard let waiter = approvalWaiters.removeValue(forKey: id) else { return }
+        let waiter = approvalWaiters.removeValue(forKey: id)
         let request = approvals.removeValue(forKey: id)
         publish(.approvalResolved(approvalID: id, decision: decision))
         log(.info, .approval, "\(decision.isApproval ? "Approved" : "Denied"): \(request?.payload ?? id)", runID: request?.runID)
-        waiter.resume(returning: decision)
+        waiter?.resume(returning: decision)
     }
 }
 

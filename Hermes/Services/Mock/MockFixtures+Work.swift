@@ -174,7 +174,7 @@ extension MockFixtures {
                             paths: ["generated-cache.json"], diff: nil,
                             reason: "Matches a dangerous-command pattern: file deletion (rm).",
                             risk: .moderate, requestedAt: clock.ago(minutes: 11), expiresAt: nil,
-                            availability: .actionable, allowsSessionApproval: true),
+                            availability: .actionable, allowsSessionApproval: true, onTimeout: "Hermes will block this command.", approvalChoices: ["once", "session", "deny"]),
             ApprovalRequest(id: "a-index", runID: "r-notes", conversationID: "c-dex", profileID: MockID.dex, kind: .fileWrite,
                             summary: "Link the new weekly note and archive three meeting links",
                             command: nil, workingDirectory: "demo/notes", paths: ["Index.md"],

@@ -390,7 +390,7 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
     }
     private func mapAttention(_ j: BridgeJSON) -> ApprovalRequest {
         var value = BridgeMapping.approval(j)
-        if value.isClarification && currentStatus.permissionScopes?.contains("approvals.respond") == false {
+        if currentStatus.permissionScopes?.contains("approvals.respond") == false {
             value.availability = .unavailableRemotely("This device has read-only access to input requests")
         }
         return value
@@ -413,7 +413,8 @@ final class BridgeHermesClient: HostService, HomeService, ConversationService, R
         continuation?.yield(.init(cursor:.init(value:""), event:.runUpserted(r))); return r
     }
     func resolveApproval(id: String, decision: ApprovalDecision) async throws {
-        throw HermesError.rejected("This action must be resolved on the Studio. Remote dangerous approvals are disabled.")
+        try check(.approvals)
+        _ = try await request("/attention/\(resource(id))/respond", method: "POST", body: .object(["choice": .string(decision.choice)]))
     }
     func answerClarification(id: String, answer: String) async throws {
         _ = try await request("/attention/\(resource(id))/respond", method:"POST", body:.object(["answer":.string(answer)]))

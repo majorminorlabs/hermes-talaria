@@ -33,6 +33,12 @@ class FakeHermes:
         self.bot_details = {}
         self.requests, self.questions = [], {}
         self.fail_registry = self.fail_title = self.wrong_profile = False
+        self.answer_calls = []
+        self.expire_on_answer = False
+        self.capability_methods = ['clarify', 'approval', 'terminal.read']
+        self.capability_error = None
+        self.approval_timeout = None
+        self.fail_config = False
         self.create_keys = {}
         self.app = web.Application()
         self.app.router.add_get('/api/ws', self.socket)
@@ -91,7 +97,15 @@ class FakeHermes:
                         row['canonical_session'] = {'id': x['stored'], 'resolved_id': x['stored'], 'title': p['title']}
                     result = {'ok': True, 'title': p['title']}
             elif method == 'client.capabilities':
-                result = {'server_requests': ['clarify', 'approval', 'terminal.read'], 'declines_not_shown': True}
+                result = {'server_requests': self.capability_methods, 'declines_not_shown': True}
+                if self.capability_error:
+                    error = {'code': self.capability_error, 'message': 'capabilities unavailable'}
+            elif method == 'request.answer':
+                self.answer_calls.append(dict(p))
+                pending = next((r for x in self.sessions.values() for r in x.get('open_requests', []) if r['id'] == p['id']), None)
+                result = {'status': 'ok' if pending and not self.expire_on_answer else 'expired'}
+                for x in self.sessions.values():
+                    x['open_requests'] = [r for r in x.get('open_requests', []) if r['id'] != p['id']]
             elif method == 'clarify.lock':
                 questions = self.questions.get(p['request_id'])
                 if questions is None or p['question_id'] not in questions:
@@ -158,6 +172,10 @@ class FakeHermes:
             return web.json_response({'paths': {x: {} for x in ['/api/sessions', '/api/cron/jobs', '/api/plugins/kanban/board', '/api/analytics/usage', '/api/skills', '/api/tools/toolsets', '/api/mcp/servers']}})
         if request.headers.get('Authorization') != 'Bearer ' + 'u' * 32:
             raise web.HTTPUnauthorized()
+        if path == '/api/config':
+            if self.fail_config:
+                raise web.HTTPServiceUnavailable()
+            return web.json_response({'approvals': {'timeout': self.approval_timeout}, 'api_key': 'must-never-leak'})
         if path == '/api/sessions':
             rows = [{'id': x['stored'], 'title': x['title'], 'message_count': len(x['messages'])} for x in self.sessions.values() if self.profile_of(x) == request.query.get('profile', 'default') and not x.get('hidden')]
             return web.json_response({'sessions': rows, 'total': len(rows)})

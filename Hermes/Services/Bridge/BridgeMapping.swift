@@ -125,18 +125,19 @@ nonisolated enum BridgeMapping {
     static func approval(_ j: BridgeJSON, hostID: String = "") -> ApprovalRequest {
         let clarify = j["kind"].string == "clarification"
         let expiry = date(j["expires_at"])
-        let fresh = clarify && j["can_respond"].bool == true && j["state"].string == "pending" && (expiry ?? .distantPast) > .now
+        let fresh = j["can_respond"].bool == true && j["state"].string == "pending" && (expiry.map { $0 > .now } ?? true)
         let d = j["details"]
         return ApprovalRequest(id: j["id"].string ?? "", runID: j["run_id"].string ?? "",
-            conversationID: j["conversation_id"].string, profileID: j["profile"].string, kind: .tool,
+            conversationID: j["conversation_id"].string, profileID: j["profile"].string, kind: d["command"].string == nil ? .tool : .command,
             summary: clarify ? (d["question"].string ?? "Hermes needs an answer") : (d["description"].string ?? "Hermes needs approval"),
             command: d["command"].string, workingDirectory: nil, paths: [], diff: nil,
-            reason: j["limitation"].string, risk: .moderate, requestedAt: date(j["observed_at"]) ?? .distantPast,
+            reason: j["limitation"].string, risk: nil, requestedAt: date(j["observed_at"]) ?? .distantPast,
             expiresAt: expiry,
-            availability: fresh ? .actionable : .unavailableRemotely(clarify ? "This question is no longer current. Check Hermes on your Mac." : "Hermes can't safely target this approval from the phone. Resolve it on your Mac, or stop the run."),
-            allowsSessionApproval: false, clarificationQuestion: clarify ? (d["question"].string ?? "Hermes needs an answer") : nil,
+            availability: j["state"].string != "pending" || (expiry ?? .distantFuture) <= .now ? .expired : fresh ? .actionable : .unavailableRemotely(clarify ? "This question is no longer current. Check Hermes on your Mac." : "Hermes can't safely target this approval from the phone. Resolve it on your Mac, or stop the run."),
+            allowsSessionApproval: !clarify && d["choices"].array.compactMap(\.string).contains("session"), clarificationQuestion: clarify ? (d["question"].string ?? "Hermes needs an answer") : nil,
             clarificationChoices: clarify ? d["choices"].array.compactMap(\.string) : nil,
-            recommendedChoice: d["recommended"].string ?? d["default"].string, onTimeout: d["on_timeout"].string)
+            recommendedChoice: d["recommended"].string ?? d["default"].string, onTimeout: d["on_timeout"].string,
+            approvalChoices: clarify ? nil : d["choices"].array.compactMap(\.string))
     }
     static func taskStatus(_ raw: String) -> TaskStatus? {
         switch raw { case "running": .inProgress; case "done", "complete": .completed; default: TaskStatus(rawValue: raw) }

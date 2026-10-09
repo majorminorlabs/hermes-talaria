@@ -154,6 +154,7 @@ struct UnpairedWelcome: View {
 /// approvals get swipe actions. No tinted row wash: the glyph carries state.
 struct AttentionRow: View {
     var item: AttentionItem
+    @State private var pendingDecisionID: String?
 
     @Environment(ActivityStore.self) private var activity
     @Environment(ConnectionStore.self) private var connection
@@ -198,14 +199,20 @@ struct AttentionRow: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if let approval, isActionable(approval) {
-                Button("Approve", systemImage: "checkmark") {
-                    toasts.perform(success: "Approved") { try await activity.resolve(approval.id, decision: .approveOnce) }
+                ForEach(approval.offeredDecisions.filter { $0 == .approveOnce || $0 == .deny }, id: \.self) { decision in
+                    Button(decision.isApproval ? "Approve" : "Deny", systemImage: decision.isApproval ? "checkmark" : "xmark") {
+                        guard pendingDecisionID != approval.id else { return }
+                        pendingDecisionID = approval.id
+                        Task {
+                            defer { pendingDecisionID = nil }
+                            do {
+                                try await activity.resolve(approval.id, decision: decision)
+                                toasts.show(decision.isApproval ? "Approved" : "Denied")
+                            } catch { toasts.show(error: error) }
+                        }
+                    }.tint(decision.isApproval ? Theme.success : Theme.failure)
+                        .disabled(pendingDecisionID == approval.id)
                 }
-                .tint(Theme.success)
-                Button("Deny", systemImage: "xmark") {
-                    toasts.perform(success: "Denied") { try await activity.resolve(approval.id, decision: .deny) }
-                }
-                .tint(Theme.failure)
             }
             if item.kind == .failedRun, let runID = item.runID {
                 Button("Dismiss", systemImage: "eye.slash") { preferences.acknowledge(runID: runID) }

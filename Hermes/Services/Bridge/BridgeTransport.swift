@@ -414,7 +414,7 @@ actor BridgeTransport {
                     throw HermesError.rejected("This request can only be handled on the Studio.")
                 }
                 if code == "stale_attention" {
-                    throw HermesError.rejected("This question is no longer available. Refresh the conversation.")
+                    throw HermesError.staleAttention
                 }
                 throw HermesError.rejected("The bridge rejected a conflicting or stale request.")
             case 503:

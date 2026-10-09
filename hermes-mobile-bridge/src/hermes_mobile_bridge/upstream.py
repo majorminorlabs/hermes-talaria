@@ -15,6 +15,7 @@ class Backend:
         self.connected = False
         self.bot_mode_supported = False
         self.server_requests_supported = False
+        self.approval_requests_supported = False
         self.declines_not_shown = False
         self.last_seen = None
         self.generation = 0
@@ -75,11 +76,11 @@ class Backend:
             if "id" in data and "method" in data:
                 params = data.get("params") or {}
                 method = data.get("method")
-                if method == "clarify":
+                if method in {"clarify", "approval"}:
                     await self.on_event(self.name, {"type": "bridge.server_request", "session_id": params.get("session_id"),
                                                    "payload": {"id": data["id"], "method": method, "params": params}})
                 else:
-                    # Never grant approval or invent credentials. Window declines allow a shown Desktop peer to answer.
+                    # Never invent credentials. Window declines allow a shown Desktop peer to answer.
                     window = method in {"terminal.read", "preview.read", "preview.act", "window.read", "tour"}
                     code = 4404 if window and self.declines_not_shown else -32601
                     await self.ws.send_json({"jsonrpc": "2.0", "id": data["id"], "error": {"code": code, "message": "No Desktop window is showing this chat" if code == 4404 else "Mobile cannot handle this request"}})
@@ -117,10 +118,20 @@ class Backend:
                     except Problem:
                         pass
                 self.server_requests_supported = False
-                if self.cfg.get("installed_commit") == "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1":
+                self.approval_requests_supported = False
+                self.declines_not_shown = False
+                try:
                     capability = await self.rpc("client.capabilities", {"server_requests": True})
-                    self.server_requests_supported = "clarify" in capability.get("server_requests", [])
+                    advertised = capability.get("server_requests", [])
+                    self.server_requests_supported = "clarify" in advertised
+                    self.approval_requests_supported = "approval" in advertised
                     self.declines_not_shown = capability.get("declines_not_shown") is True
+                except Exception:
+                    # Unknown RPC, failed negotiation or malformed reply: legacy
+                    # observation remains available, with no request handlers.
+                    self.server_requests_supported = False
+                    self.approval_requests_supported = False
+                    self.declines_not_shown = False
                 self.connected = True
                 self.generation += 1
                 delay = 0.5

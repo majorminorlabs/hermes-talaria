@@ -13,7 +13,7 @@ Every request requires **Authorization: Bearer <mobile-device-token>**. Mobile a
 | read | Required for all requests; authorized profiles, runs, tasks, events and registered artifacts |
 | chat.control | Conversations, run controls, attachment uploads and capability-gated bot management |
 | tasks.manage | Cron/Kanban mutations; assigning another worker requires that worker profile's permission |
-| approvals.respond | Exact clarifications only; dangerous approvals remain disabled |
+| approvals.respond | Exact clarifications and approval server requests; legacy FIFO approvals remain disabled |
 
 Every mutation requires a UUID **Idempotency-Key** header and a JSON object, including {} for empty actions. Persisting its receipt precedes dispatch. The same device/key/method/path/query/body returns the recorded response; a changed payload/device conflicts. Pending or uncertain commands return 409 command_uncertain. An interrupted request does not prove nonexecution. Never automatically repeat an uncertain operation with a new UUID.
 
@@ -48,7 +48,7 @@ Collection/inventory profile query defaults to default. Detail IDs carry their o
 | GET /events?after=&limit= | Cursor; limit 1–500 | ReplayPage across authorized profiles |
 | GET /events/stream?after= | Or Last-Event-ID; omission starts at current watermark | Authenticated SSE across authorized profiles |
 | GET /attention | — | {items:[Attention]}, up to 200 recent observations |
-| POST /attention/{id}/respond | {answer} for clarification; approval {choice} rejected | Acknowledgement or 409 |
+| POST /attention/{id}/respond | {answer} for clarification; {choice} for exact approval | Acknowledgement or 409 |
 | GET /inventory/{resource}?profile= | skills/tools/mcp/models/usage/host/memory; usage days 1–365 | Allowlisted inventory |
 | GET /cron?profile= | — | {jobs:[ScheduledJob]} |
 | POST /cron?profile= | {prompt,schedule,name?,deliver?,skills?} | 201 ScheduledJob |
@@ -182,7 +182,9 @@ Home captures its watermark before upstream reads. Hydration is not one atomic t
 
 Attention fields: id/run_id/conversation_id/profile/kind/state/observed_at/expires_at/can_respond/limitation/details. Details include command/description/patterns/permanent-policy flag or question/choices.
 
-Dangerous approvals always have can_respond=false and limitation=upstream_fifo_without_exact_target. Every choice, including denial, returns 409 exact_target_unavailable. A bridge ID is not an atomic Hermes request target. Phone requests never call approval.respond. Handle approvals locally or stop the entire owned run.
+On audited Hermes `4bb9e57`, approval server requests carry an exact `srq-…` ID and a separate queue `request_id`. These attention items have `kind=approval` and `can_respond=true`. POST `/attention/{id}/respond` with `{"choice":"once"}`, `{"choice":"session"}`, or `{"choice":"deny"}` as offered by `details.choices`. The bridge checks the pending item, expiry, continuous connection generation, waiting run, and both IDs in a fresh `session.resume.open_requests` snapshot. It answers via Hermes's acknowledged `request.answer` proxy to the JSON-RPC response resolver. A repeat, cancellation, or losing race returns `409 stale_attention`. Approval expiry uses the profile’s `approvals.timeout` read through Hermes `GET /api/config` when available; otherwise `expires_at` is null and there is no local expiry. `request.cancel` expires the item and emits `approval.resolved`; replay never revives an answered or withdrawn item.
+
+`all` is rejected. `always` returns `400 invalid_choice` from mobile regardless of `allow_permanent`; Talaria v1 omits it entirely. Details include the command, description, choices, permanent policy, and `on_timeout` when supplied. Legacy `approval.request` events retain `can_respond=false` and `limitation=upstream_fifo_without_exact_target`; every choice returns `409 exact_target_unavailable`. Phone responses never use the FIFO `approval.respond` operation.
 
 Clarifications use actual upstream request IDs internally. Responses require a pending observation, the same continuous upstream connection generation, a waiting run, and age below 290 seconds. Resume/replay does not refresh IDs or expiry. Stale/expired/reconnected prompts fail closed. Secret/password and terminal-buffer prompts remain local-only. Completion/disconnect invalidates attention as uncertain; expiration reflects a bridge deadline, not proof of an upstream decision.
 
@@ -190,7 +192,7 @@ A stop records durable intent. If Hermes enqueues a prompt after interrupt clear
 
 ## Capabilities, inventory and errors
 
-Capabilities include current socket health, discovered route availability, configured boards/roots/workspaces (each profile includes its boards allowlist), audited/installed commit metadata, scopes and retention. Sessions/runs/stop/steering require a usable structured socket; replay remains available offline. Inventory route discovery uses OpenAPI rather than API-server capability flags. Permission scopes are an additional check. Bot Mode and writable Bot Chat require explicit source grants and an audited Bot Mode handshake; rooms are false; dangerous approval response is false. CLI source verification when source_dir is configured does not attest a running HTTP binary launched elsewhere.
+Capabilities include current socket health, discovered route availability, configured boards/roots/workspaces (each profile includes its boards allowlist), audited/installed commit metadata, scopes and retention. Sessions/runs/stop/steering require a usable structured socket; replay remains available offline. Inventory route discovery uses OpenAPI rather than API-server capability flags. Permission scopes are an additional check. Bot Mode and writable Bot Chat require explicit source grants and an audited Bot Mode handshake; rooms are false; dangerous approval response requires a connected backend advertising `approval` server requests; its reason is present only when unavailable. CLI source verification when source_dir is configured does not attest a running HTTP binary launched elsewhere.
 
 Inventory includes skills metadata, CLI-default toolsets, credential-free provider/model metadata/capabilities, MCP name/transport/enabled/tool selection, Hermes usage analytics, host metrics and memory provider/file-size metadata. It excludes raw config, MCP commands/env/auth/URLs, memory contents, logs, billing changes and global settings. Configured MCP/tool availability does not prove external service health.
 

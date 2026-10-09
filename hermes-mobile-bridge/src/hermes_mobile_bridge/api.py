@@ -111,7 +111,11 @@ async def capabilities(request):
         b = s.backends[p]
         paths = b.paths
         available = lambda route: b.connected and route in paths
-        result[p] = {"health": b.health(), "features": {"sessions": b.connected, "runs": b.connected, "runReplay": True, "stop": b.connected, "steering": b.connected, "approvals": {"observe": b.connected, "respond": False, "reason": "upstream_fifo_without_exact_target", "clarifications": b.connected and (b.server_requests_supported or b.cfg.get("installed_commit") != "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1")}, "profiles": True, "cron": available("/api/cron/jobs"), "kanban": bool(b.cfg["boards"]) and available("/api/plugins/kanban/board"), "usage": available("/api/analytics/usage"), "skills": available("/api/skills"), "tools": available("/api/tools/toolsets"), "mcp": available("/api/mcp/servers"), "artifacts": bool(b.cfg["artifact_roots"]), "botMode": b.connected and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botChat": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botThreads": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "captures": True, "botRooms": False, "attachments": b.connected and b.cfg.get("installed_commit") in {"2a4c9afd7bd", "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "imageUpload": b.connected and b.cfg.get("installed_commit") == "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "desktop_contract_audited": 2, "audited_commit": b.cfg.get("installed_commit") or "2a4c9afd7bd", "installed_commit": b.cfg.get("installed_commit"), "boards": b.cfg["boards"], "workspaces": [{"id": k, "name": k} for k in b.cfg["workspaces"]]}
+        approvals = {"observe": b.connected, "respond": b.connected and b.approval_requests_supported,
+                     "clarifications": b.connected and b.server_requests_supported}
+        if not approvals["respond"]:
+            approvals["reason"] = "upstream_unavailable" if not b.connected else "upstream_fifo_without_exact_target"
+        result[p] = {"health": b.health(), "features": {"sessions": b.connected, "runs": b.connected, "runReplay": True, "stop": b.connected, "steering": b.connected, "approvals": approvals, "profiles": True, "cron": available("/api/cron/jobs"), "kanban": bool(b.cfg["boards"]) and available("/api/plugins/kanban/board"), "usage": available("/api/analytics/usage"), "skills": available("/api/skills"), "tools": available("/api/tools/toolsets"), "mcp": available("/api/mcp/servers"), "artifacts": bool(b.cfg["artifact_roots"]), "botMode": b.connected and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botChat": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "botThreads": b.connected and b.cfg.get("bot_chat_control", False) and b.cfg.get("bot_mode_roster", False) and b.bot_mode_supported, "captures": True, "botRooms": False, "attachments": b.connected and b.cfg.get("installed_commit") in {"2a4c9afd7bd", "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "imageUpload": b.connected and b.cfg.get("installed_commit") == "4bb9e57bfde8a0affb5553eff13ed6e1f14147f1"}, "desktop_contract_audited": 2, "audited_commit": b.cfg.get("installed_commit") or "2a4c9afd7bd", "installed_commit": b.cfg.get("installed_commit"), "boards": b.cfg["boards"], "workspaces": [{"id": k, "name": k} for k in b.cfg["workspaces"]]}
         result[p]["features"].update(BotMode(s, request[AUTH]).capabilities(p))
     return web.json_response({"api_version": 1, "bridge_version": __version__, "journal_epoch": s.store.epoch, "cursor": s.store.cursor(), "scopes": request[AUTH]["scopes"], "profiles": result, "retention": {"global_events": s.cfg["event_limit"], "per_run_events": s.cfg["run_event_limit"], "days": s.cfg["event_days"]}, "coverage": "Controlled runs are bridge-owned desktop sessions; other-process activity is read-only and incomplete"})
 
@@ -408,7 +412,7 @@ async def attention(request):
     for row in s.store.db.execute("SELECT data FROM attention ORDER BY rowid DESC LIMIT 200").fetchall():
         item = json.loads(row[0])
         if item["profile"] in s.profiles(request[AUTH]):
-            if item["state"] == "pending" and item["expires_at"] < now():
+            if item["state"] == "pending" and item["expires_at"] is not None and item["expires_at"] < now():
                 await s.invalidate_attention(item["run_id"], "expired")
                 item = s.store.get("attention", item["id"])["data"]
             items.append(s.attention_view(item))
@@ -427,16 +431,45 @@ async def _attention_respond(request):
     item = s.store.get("attention", identifier(request.match_info["aid"]))["data"]
     b = s.require(request[AUTH], item["profile"], "approvals.respond")
     body = shape(request[BODY], {"answer": str, "choice": str})
-    if not item["can_respond"] or item["kind"] != "clarification":
+    if item["kind"] not in {"clarification", "approval"} or (item["kind"] == "approval" and not item.get("upstream_request_id")):
         raise Problem(409, "exact_target_unavailable", "Remote dangerous approval is disabled; Hermes resolves a FIFO without exact IDs", limitation=item["limitation"])
-    if item["state"] != "pending" or now() >= item["expires_at"] or b.generation != item["generation"] or not b.connected:
+    if not item["can_respond"] or item["state"] != "pending" or (item["expires_at"] is not None and now() >= item["expires_at"]) or b.generation != item["generation"] or not b.connected:
         raise Problem(409, "stale_attention", "Prompt is expired or its connection changed")
-    if "answer" not in body or "choice" in body:
-        raise Problem(400, "invalid_request", "Clarification requires answer")
     run = s.run(request[AUTH], item["run_id"])
-    if run["state"] != "waiting_for_input":
+    if run["state"] != "waiting_for_input" or run["data"].get("stop_intent"):
         raise Problem(409, "stale_attention", "Run is no longer waiting")
-    if item.get("question_id"):
+    if item["kind"] == "approval":
+        if set(body) != {"choice"}:
+            raise Problem(400, "invalid_request", "Approval requires only choice")
+        choice = body["choice"]
+        if choice not in {"once", "session", "deny"} or choice not in item["details"].get("choices", []):
+            raise Problem(400, "invalid_choice", "Choose an offered approval choice")
+        if not b.approval_requests_supported:
+            raise Problem(409, "stale_attention", "Approval requests are unavailable")
+        conv = s.store.get("conversations", run["conversation_id"])
+        if conv["data"].get("canonical"):
+            conv = await s.refresh_bot_binding(conv, control=True)
+        snapshot = await b.rpc("session.resume", {"session_id": conv["stored_id"], "profile": s.session_profile(conv), "omit_messages": True, "close_on_disconnect": False})
+        pending = next((r for r in snapshot.get("open_requests", []) if r.get("id") == item["request_id"] and r.get("method") == "approval"), None)
+        current = s.store.get("attention", item["id"])["data"]
+        if (not pending or snapshot.get("session_id") != run["live_id"] or
+                pending.get("params", {}).get("request_id") != item["upstream_request_id"] or
+                current["state"] != "pending" or not b.connected or b.generation != item["generation"] or (item["expires_at"] is not None and now() >= item["expires_at"])):
+            await s.event(item["profile"], {"type": "request.cancel", "session_id": run["live_id"], "payload": {"id": item["request_id"], "method": "approval", "reason": "stale"}})
+            raise Problem(409, "stale_attention", "Hermes no longer has this approval open")
+        payload = pending.get("params", {})
+        if choice not in payload.get("choices", []):
+            raise Problem(400, "invalid_choice", "Approval choices changed")
+        # Hermes's acknowledged proxy feeds this exact JSON-RPC response to
+        # resolve_response, returning expired if another surface wins the race.
+        result = await b.rpc("request.answer", {"id": item["request_id"], "result": {"choice": choice}})
+        if result.get("status") != "ok":
+            await s.event(item["profile"], {"type": "request.cancel", "session_id": run["live_id"], "payload": {"id": item["request_id"], "method": "approval", "reason": "stale"}})
+            raise Problem(409, "stale_attention", "Hermes no longer has this approval open")
+        remaining = [r for r in snapshot.get("open_requests", []) if r.get("id") != item["request_id"]]
+    elif "answer" not in body or "choice" in body:
+        raise Problem(400, "invalid_request", "Clarification requires answer")
+    elif item.get("question_id"):
         conv = s.store.get("conversations", run["conversation_id"])
         if conv["data"].get("canonical"):
             conv = await s.refresh_bot_binding(conv, control=True)
@@ -457,7 +490,7 @@ async def _attention_respond(request):
     latest = s.store.get("runs", run["id"])
     if latest["state"] not in TERMINAL and not latest["data"].get("stop_intent"):
         s.store.update_run(run["id"], "waiting_for_input" if remaining else "running")
-    await s.emit(item["profile"], "approval.resolved", {"id": item["id"], "state": "responded", "kind": "clarification"}, run)
+    await s.emit(item["profile"], "approval.resolved", {"id": item["id"], "state": "responded", "kind": item["kind"]}, run)
     return web.json_response({"acknowledged": True})
 
 

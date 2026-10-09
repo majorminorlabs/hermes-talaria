@@ -29,6 +29,7 @@ struct WorkItemRow: View {
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("work-item-\(item.id)")
         .accessibilityLabel("\(item.title). \(environment.profiles.name(item.agentID)). \(stateLine). \(item.isUnread ? "Unread" : "Read")")
         .accessibilityAction(named: item.isUnread ? "Mark read" : "Mark unread") { environment.seen.mark(item.id, at: item.isUnread ? .now : .distantPast, host: environment.connection.activeHostID) }
         .accessibilityAction(named: item.isPinned ? "Unpin" : "Pin") { if item.kind == .conversation { environment.toasts.perform { try await environment.conversations.setPinned(!item.isPinned, item.id) } } }
@@ -51,6 +52,7 @@ struct NowView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var expanded = false
     @State private var risk: RiskAction?
+    @State private var pendingDecisionIDs: Set<String> = []
     var body: some View {
         ScrollViewReader { proxy in
         TimelineView(.periodic(from: .now, by: 30)) { _ in
@@ -127,11 +129,36 @@ struct NowView: View {
         let count = environment.needsYou.actionableCount
         return [count == 0 ? nil : "\(count) need you", working.isEmpty ? nil : "\(working.count) working"].compactMap { $0 }.joined(separator: " · ")
     }
-    private func row(_ item: WorkItem) -> some View { NavigationLink(value: item.route) { WorkItemRow(item: item) }.swipeActions {
-        if let run = item.runs.first(where: { $0.canStop }), environment.connection.connection.isConnected {
-            Button("Stop", role: .destructive) { risk = RiskAction(verb: "Stop", effect: "Stops all of this work. Work already done stays.", target: item.title) { try await environment.activity.stop(run.id) } }
+    private func row(_ item: WorkItem) -> some View {
+        let approval = item.runs.compactMap { environment.activity.pendingApproval(for: $0) }.first {
+            !$0.isClarification && $0.effectiveAvailability(remoteApprovalsSupported: environment.connection.supports(.approvals)).isActionable
         }
-    } }
+        return NavigationLink(value: item.route) { WorkItemRow(item: item) }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if let approval, environment.connection.connection.isConnected {
+                ForEach(approval.offeredDecisions.filter { $0 == .approveOnce || $0 == .deny }, id: \.self) { decision in
+                    Button(decision.isApproval ? "Approve" : "Deny", systemImage: decision.isApproval ? "checkmark" : "xmark") {
+                        guard pendingDecisionIDs.insert(approval.id).inserted else { return }
+                        Task {
+                            defer { pendingDecisionIDs.remove(approval.id) }
+                            do {
+                                try await environment.activity.resolve(approval.id, decision: decision)
+                                environment.toasts.show(decision.isApproval ? "Approved" : "Denied")
+                            } catch { environment.toasts.show(error: error) }
+                        }
+                    }
+                    .tint(decision.isApproval ? Theme.success : Theme.failure)
+                    .disabled(pendingDecisionIDs.contains(approval.id))
+                    .accessibilityIdentifier("now-approval-\(approval.id)-\(decision.choice)")
+                }
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if let run = item.runs.first(where: { $0.canStop }), environment.connection.connection.isConnected {
+                Button("Stop", role: .destructive) { risk = RiskAction(verb: "Stop", effect: "Stops all of this work. Work already done stays.", target: item.title) { try await environment.activity.stop(run.id) } }
+            }
+        }
+    }
 }
 struct ThreadsView: View {
     @Environment(AppEnvironment.self) private var environment

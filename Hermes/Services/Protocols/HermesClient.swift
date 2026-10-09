@@ -31,6 +31,7 @@ nonisolated enum HermesError: LocalizedError, Equatable, Sendable {
     case unauthorized
     case unsupported(HermesCapability)
     case notFound
+    case staleAttention
     case rejected(String)
     case botModelConfirmation
     case botModelConfirmationText(String)
@@ -44,6 +45,7 @@ nonisolated enum HermesError: LocalizedError, Equatable, Sendable {
         case .hermesOffline: "Hermes isn't responding"
         case .unauthorized: "Pairing required"
         case .unsupported(let capability): "\(capability.label) isn't available on this host"
+        case .staleAttention: "No longer pending. Refreshed."
         case .notFound: "Not found"
         case .botModelConfirmation: "Hermes requires confirmation before switching to this model."
         case .botModelConfirmationText(let message): message
@@ -61,7 +63,7 @@ nonisolated enum HermesError: LocalizedError, Equatable, Sendable {
         case .unauthorized: "Pair this iPhone again in Studio › Hosts."
         case .unsupported: "Updating Hermes or its bridge on the Mac may enable this."
         case .notFound: "It may have been removed on your Mac."
-        case .rejected, .botModelConfirmation, .botModelConfirmationText: nil
+        case .staleAttention, .rejected, .botModelConfirmation, .botModelConfirmationText: nil
         case .timeout: "Try again in a moment."
         case .resyncRequired: nil
         case .commandUncertain: "Don't repeat it yet. It may already be running on your Mac. Refresh first."

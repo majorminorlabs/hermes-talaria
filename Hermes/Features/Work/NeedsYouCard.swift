@@ -42,15 +42,15 @@ struct NeedsYouCard: View {
                     }
                 }.font(.footnote).foregroundStyle(Theme.secondaryText)
                 Text(item.request).font(.headline)
-                if let command = item.approval?.command { CommandBlock(text: command) }
-                if let timeout = item.approval?.onTimeout { Text("If you do not answer: " + timeout).font(.footnote).foregroundStyle(Theme.secondaryText) }
+                if item.kind != .approval, let command = item.approval?.command { CommandBlock(text: command) }
+                if item.kind != .approval, let timeout = item.approval?.onTimeout { Text("If you do not answer: " + timeout).font(.footnote).foregroundStyle(Theme.secondaryText) }
                 if let details = item.context { Text(details).font(.subheadline).foregroundStyle(Theme.secondaryText).lineLimit(3) }
                 responseControls(expired: expired)
                 if sending { ProgressView("Sending…") }
                 if let error { Text(error).font(.footnote).foregroundStyle(Theme.failure) }
                 if !live { Text("Reconnect to answer.").font(.footnote).foregroundStyle(Theme.secondaryText) }
                 HStack {
-                    LaterMenu(item: item)
+                    if item.kind != .approval { LaterMenu(item: item) }
                     Spacer()
                     if let id = item.workItemID { NavigationLink("Open thread", value: id.hasPrefix("task:") ? Route.task(String(id.dropFirst(5))) : Route.thread(id)) }
                 }.font(.footnote)
@@ -76,11 +76,9 @@ struct NeedsYouCard: View {
                     Text("Hermes stopped waiting. It may have continued without this.").font(.footnote).foregroundStyle(Theme.secondaryText)
                     Button("Dismiss") { dismiss() }
                 } else if item.kind == .approval {
-                    Label("Approve on your Mac. Talaria can't target this safely.", systemImage: "desktopcomputer").font(.footnote)
-                    if let run = environment.activity.run(item.runID), run.canStop {
-                        Button("Stop work") { risk = RiskAction(verb: "Stop", effect: "Stops all of this work. Work already done stays.", target: run.title) { try await environment.activity.stop(run.id) } }.disabled(!live)
+                    if let approval = item.approval {
+                        ApprovalCard(approval: approval, style: .plain)
                     }
-                    if let id = item.approval?.id { NavigationLink("Details", value: Route.approval(id)) }
                 } else if item.kind == .question || item.kind == .decision {
                     ForEach(item.choices, id: \.self) { choice in Button(choice + (item.approval?.recommendedChoice == choice ? " · recommended" : "")) { respond(choice) }.frame(minHeight: 44).disabled(!live || sending) }
                     Button(item.choices.isEmpty ? "Answer…" : "Other…") { answering.toggle() }.frame(minHeight: 44).disabled(!live || sending)

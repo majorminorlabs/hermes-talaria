@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -7,7 +8,7 @@ import subprocess
 import sys
 from aiohttp import web
 from .api import create_app
-from .core import SCOPES, load_config
+from .core import Problem, SCOPES, load_config
 from .bots import AUDITED_COMMITS
 from .store import Store
 
@@ -24,11 +25,17 @@ def main():
     revoke = sub.add_parser("token-revoke")
     revoke.add_argument("id")
     sub.add_parser("token-list")
+    reconcile = sub.add_parser("reconcile-run", help="Reconcile one unknown/uncertain run after a live Hermes check")
+    reconcile.add_argument("run_id")
+    reconcile.add_argument("--reason", required=True)
     args = parser.parse_args()
     os.umask(0o077)
     try:
         cfg = load_config(args.config)
-        if args.command == "serve":
+        if args.command == "reconcile-run":
+            from .operator import reconcile_run
+            print(json.dumps(asyncio.run(reconcile_run(cfg, args.run_id, args.reason))))
+        elif args.command == "serve":
             for b in cfg["backends"].values():
                 if b.get("source_dir"):
                     b["installed_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=b["source_dir"], text=True, timeout=5).strip()
@@ -62,6 +69,9 @@ def main():
                     print(json.dumps([dict(r) for r in rows]))
             finally:
                 store.close()
+    except Problem as error:
+        print(json.dumps(error.body()), file=sys.stderr)
+        sys.exit(1)
     except (ValueError, OSError, subprocess.SubprocessError):
         print("Bridge configuration/startup failed. Check private file permissions, backend origins, audited commit, TLS, and state ownership.", file=sys.stderr)
         sys.exit(1)

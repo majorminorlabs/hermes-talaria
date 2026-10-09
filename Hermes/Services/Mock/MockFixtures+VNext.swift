@@ -1,10 +1,6 @@
 import Foundation
 extension MockFixtures {
     mutating func addVNext(now: Date) {
-        for i in approvals.indices where !approvals[i].isClarification {
-            approvals[i].availability = .unavailableRemotely("Approve on your Mac. Talaria cannot safely target this approval.")
-            approvals[i].allowsSessionApproval = false
-        }
         for (id,name) in [("research-orchestrator", "Research Orchestrator"), ("research-worker", "Research Worker")] {
             profiles.append(Profile(id: id, name: name, role: "Research", summary: "Research agent", tint: .indigo, model: MockModels.sonnet, status: .idle, hostID: MockID.studio, isDefault: false, skillIDs: [], toolsets: [], mcpServerIDs: []))
         }

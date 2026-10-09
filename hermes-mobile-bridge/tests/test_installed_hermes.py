@@ -42,6 +42,9 @@ class LocalModel:
         if 'exercise-clarify' in str(user) and not tool_done:
             wants_tool = True
             payload = {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'call_clarify', 'type': 'function', 'function': {'name': 'clarify', 'arguments': json.dumps({'questions': [{'question': 'Fixture question one?', 'choices': ['Proceed', 'Wait']}, {'question': 'Fixture question two?'}]})}}]}
+        if 'exercise-approval' in str(user) and not tool_done:
+            wants_tool = True
+            payload = {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'call_approval', 'type': 'function', 'function': {'name': 'terminal', 'arguments': json.dumps({'command': 'rm -rf approval-fixture.txt', 'timeout': 10})}}]}
         finish = 'tool_calls' if wants_tool else 'stop'
         if body.get('stream'):
             response = web.StreamResponse(headers={'Content-Type': 'text/event-stream'})
@@ -79,6 +82,8 @@ async def test_installed_source_end_to_end(tmp_path):
 agent:
   max_turns: 4
   reasoning_effort: none
+approvals:
+  timeout: 900
 toolsets: [terminal, file, skills, clarify]
 display:
   tool_progress: all
@@ -313,6 +318,36 @@ memory:
             await request('POST', f"/kanban/tasks/{card['id']}/reassign", {'profile': ''})
             await request('DELETE', f"/kanban/tasks/{child['id']}", {})
             await request('DELETE', f"/kanban/tasks/{card['id']}", {})
+        # Real installed Hermes queue, tool, cancellation, and exact approval settlement.
+        if commit == '4bb9e57bfde8a0affb5553eff13ed6e1f14147f1':
+            for choice in ['once', 'deny', 'mac']:
+                fixture = work / 'approval-fixture.txt'
+                fixture.write_text('Disposable approval fixture')
+                ac = await request('POST', '/conversations', {'title': 'Approval ' + choice, 'workspace': 'test'}, 201)
+                ar = await request('POST', f"/conversations/{ac['id']}/runs", {'text': 'exercise-approval-' + choice}, 202)
+                def pending_approval():
+                    return next((json.loads(x[0]) for x in service.store.db.execute('SELECT data FROM attention WHERE run_id=?', (ar['id'],)).fetchall() if json.loads(x[0])['kind'] == 'approval'), None)
+                await eventually(pending_approval, timeout=40)
+                ai = pending_approval()
+                assert ai['can_respond'] and ai['upstream_request_id']
+                assert ai['expires_at'] == ai['observed_at'] + 900
+                if choice == 'mac':
+                    # Native Mac action resolves the queue from another surface.
+                    sid = service.store.get('runs', ar['id'])['live_id']
+                    await service.backends['default'].rpc('approval.respond', {'session_id': sid, 'choice': 'once'})
+                    await eventually(lambda: service.store.get('attention', ai['id'])['data']['state'] == 'expired')
+                    stale = await request('POST', f"/attention/{ai['id']}/respond", {'choice': 'once'}, 409)
+                    assert stale['error']['code'] == 'stale_attention'
+                else:
+                    await request('POST', f"/attention/{ai['id']}/respond", {'choice': choice})
+                await eventually(lambda: service.store.get('runs', ar['id'])['state'] in {'complete', 'failed'}, timeout=30)
+                assert service.store.get('runs', ar['id'])['state'] == 'complete'
+                if choice == 'deny':
+                    assert fixture.exists()
+                    assert any('BLOCKED' in str(m.get('content')) for call in model.calls for m in call['messages'] if m.get('role') == 'tool')
+                else:
+                    assert not fixture.exists(), 'Approved command did not execute'
+            print('Installed Hermes approvals: once executed, deny BLOCKED, Mac settlement stale')
         # Fresh conversation ensures this request actually executes a tool.
         tc = await request('POST', '/conversations', {'title': 'Tool integration', 'workspace': 'test'}, 201)
         tr = await request('POST', f"/conversations/{tc['id']}/runs", {'text': 'exercise-tool'}, 202)

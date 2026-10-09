@@ -58,6 +58,8 @@ final class MockEventLog {
 @Observable
 final class SimulationControls {
     var latency: SimulatedLatency = .fast
+    var staleNextApproval = false
+    var staleNextClarification = false
     var failRequests = false
     var emptyData = false
     var nextSendUncertain = false

@@ -21,8 +21,10 @@ nonisolated struct ApprovalRequest: Identifiable, Hashable, Codable, Sendable {
     var diff: String?
     /// Why Hermes flagged this (pattern match, policy, …).
     var reason: String?
-    var risk: ApprovalRisk
+    /// Nil when the host has not supplied a risk assessment.
+    var risk: ApprovalRisk?
     var requestedAt: Date
+    /// Nil means Hermes owns withdrawal; never invent a local deadline.
     var expiresAt: Date?
     var availability: ApprovalAvailability
     var allowsSessionApproval: Bool
@@ -31,6 +33,16 @@ nonisolated struct ApprovalRequest: Identifiable, Hashable, Codable, Sendable {
 
     var recommendedChoice: String? = nil
     var onTimeout: String? = nil
+    var approvalChoices: [String]? = nil
+
+    var timeoutExplanation: String? {
+        isClarification ? onTimeout.map { "If you do not answer: " + $0 }
+            : "If you don't answer, Hermes blocks this command."
+    }
+
+    var offeredDecisions: [ApprovalDecision] {
+        (approvalChoices ?? []).compactMap(ApprovalDecision.init(choice:))
+    }
 
     var isClarification: Bool { clarificationQuestion != nil }
 
@@ -52,6 +64,7 @@ nonisolated struct ApprovalRequest: Identifiable, Hashable, Codable, Sendable {
 
     /// Availability after applying expiry and host capability.
     func effectiveAvailability(remoteApprovalsSupported: Bool, now: Date = .now) -> ApprovalAvailability {
+        if availability == .expired { return .expired }
         if let expiresAt, expiresAt <= now { return .expired }
         guard remoteApprovalsSupported || isClarification else {
             return .unavailableRemotely("This host doesn't support approving actions from the phone.")
@@ -134,5 +147,20 @@ nonisolated enum ApprovalDecision: String, Codable, Sendable {
     case approveForSession
     case deny
 
+    init?(choice: String) {
+        switch choice {
+        case "once": self = .approveOnce
+        case "session": self = .approveForSession
+        case "deny": self = .deny
+        default: return nil
+        }
+    }
+
+    var choice: String {
+        switch self { case .approveOnce: "once"; case .approveForSession: "session"; case .deny: "deny" }
+    }
+    var title: String {
+        switch self { case .approveOnce: "Approve once"; case .approveForSession: "Approve for session"; case .deny: "Deny" }
+    }
     var isApproval: Bool { self != .deny }
 }

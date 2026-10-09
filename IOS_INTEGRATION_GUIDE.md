@@ -34,7 +34,7 @@ These are interface responsibilities, not Swift implementations:
 | BridgeEventService | One SSE parser, durable cursor, polling replay, gap/epoch recovery, sequence deduplication |
 | ConversationService | List/search/create/inspect/resume/rename/archive/delete; workspace/model/reasoning creation options |
 | RunService | Start/status/list/stop/steer/explicit retry; run projection keyed by bridge run ID |
-| AttentionService | Context-rich attention list, capability-gated exact clarification response, disabled dangerous approval controls |
+| AttentionService | Context-rich attention list, capability-gated exact clarification and approval responses |
 | ScheduledWorkService | Cron list/detail/create/edit/enable/disable/trigger/delete and canonical recent results |
 | KanbanService | Board/task/detail/assignment/dependencies/heartbeat/attempts/transitions/reclaim/reassign |
 | InventoryService | Profiles/SOUL, skills/tools/MCP/models, host metrics, memory metadata and usage |
@@ -81,7 +81,7 @@ Artifacts are downloaded by ID into app-private storage; validate byte/type limi
 
 **Steer:** POST runs/{id}/steer → queued is acknowledged, consumed=false remains truthful. Continue watching the same run. This is not a new conversation message/run submission.
 
-**Attention:** show run/session context, command/description/patterns, age and limitation. Disable dangerous approve/deny controls whenever can_respond=false; in this release they are always disabled for dangerous approvals. Only exact clarifications accept answer. Do not convert a disabled denial into a FIFO call. Offer whole-run stop separately where controls.stop is available.
+**Attention:** show run/session context, command/description/patterns, age and limitation. Disable dangerous approve/deny controls whenever can_respond=false; legacy FIFO approvals remain disabled. Exact clarification requests accept `answer`; exact approval server requests accept `choice` from the offered choices. Omit permanent approval on the phone. A `409 stale_attention` shows "No longer pending" and refreshes attention. Do not convert a disabled denial into a FIFO call. Offer whole-run stop separately where controls.stop is available.
 
 **Retry:** failed/cancelled run → explicit user retry creates a new run with parent_run_id. Unknown cannot be retried automatically. Retry does not reverse earlier tool effects.
 

@@ -143,11 +143,28 @@ final class ActivityStore {
     }
 
     func resolve(_ approvalID: String, decision: ApprovalDecision) async throws {
-        try await client.runs.resolveApproval(id: approvalID, decision: decision)
+        do {
+            try await client.runs.resolveApproval(id: approvalID, decision: decision)
+            approvals[approvalID] = nil
+            resolvedApprovals[approvalID] = decision
+            persist()
+        } catch HermesError.staleAttention {
+            approvals[approvalID] = nil
+            persist()
+            await refresh()
+            throw HermesError.staleAttention
+        }
     }
 
     func answerClarification(_ id: String, answer: String) async throws {
-        try await client.runs.answerClarification(id: id, answer: answer)
+        do {
+            try await client.runs.answerClarification(id: id, answer: answer)
+        } catch HermesError.staleAttention {
+            approvals[id] = nil
+            persist()
+            await refresh()
+            throw HermesError.staleAttention
+        }
     }
 
     func loadRun(_ id: String) async {

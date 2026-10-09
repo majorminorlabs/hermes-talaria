@@ -27,15 +27,13 @@ final class InteractionTests: XCTestCase {
         XCTAssertEqual(app.tabBars.buttons.count,3)
         XCTAssertTrue(app.buttons["ask-toolbar"].exists)
     }
-    func testClarificationAnswerAndMacOnlyApproval() {
+    func testClarificationAndApprovalCardAboveComposer() {
         launch()
         let card = element("needs-you-card-q-expiring")
         XCTAssertTrue(card.waitForExistence(timeout:10)); card.buttons["Continue"].tap()
         XCTAssertTrue(app.staticTexts["Answer sent"].waitForExistence(timeout:5) || !card.exists)
-        XCTAssertFalse(app.buttons["Approve"].exists); XCTAssertFalse(app.buttons["Deny"].exists)
         tab("Threads"); row("Caddy").tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'Approve on your Mac'")).firstMatch.waitForExistence(timeout:5))
-        XCTAssertFalse(app.buttons["Approve Once"].exists)
+        XCTAssertTrue(app.buttons["approval-a-rm-once"].waitForExistence(timeout:5))
         let approvalCard = element("needs-you-card-a-rm")
         let composer = app.textFields["Hermes is waiting…"]
         XCTAssertTrue(approvalCard.waitForExistence(timeout:5))
